@@ -137,3 +137,9 @@ Eventos centrais no barramento:
 ## Referências
 - `docs/system-design-cadastro-usuarios-fastfood.md`
 - `docs/architecture.mermaid`
+
+## Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
+
+Copyright (c) 2011-2026 The Bootstrap Authors
