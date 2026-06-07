@@ -1,0 +1,67 @@
+flowchart TD
+	%% Camada de clientes e borda
+	subgraph Cliente[Clientes]
+		A[Apps Web/Mobile]
+	end
+
+	subgraph Borda[Borda e Seguranca]
+		B[API Gateway\nJWT local verification]
+	end
+
+	%% Dominio de identidade
+	subgraph Servicos[Servicos de Identidade]
+		C[Auth Service]
+		D[User Service]
+		E[Address Service]
+	end
+
+	%% Persistencia e cache
+	subgraph Dados[Persistencia e Cache]
+		F[(PostgreSQL Primary\nCredenciais, Perfil, Enderecos)]
+		FR[(PostgreSQL Read Replica\nLeituras de perfil)]
+		I[(Redis\nSessao, Rate Limit, OTP, Revogacao)]
+	end
+
+	%% Mensageria e consumidores
+	subgraph Eventos[Assincronismo]
+		K[[Event Bus]]
+		DLQ[(Dead-Letter Queue)]
+	end
+
+	subgraph Externos[Servicos Externos e Consumidores]
+		M[Notification Service]
+		J[Email/SMS Provider]
+		L[Analytics / CDP]
+		N[Geocoding Provider]
+	end
+
+	%% Fluxo principal
+	A -->|HTTPS| B
+	B -->|Auth routes| C
+	B -->|User routes| D
+	B -->|Address routes| E
+
+	%% Dados
+	C -->|write/read| F
+	D -->|write/read| F
+	E -->|write/read| F
+	D -->|read heavy| FR
+	F -->|streaming replication| FR
+
+	%% Cache e seguranca
+	C -->|OTP, rate limit, token revocation| I
+	B -.->|check revoked token when needed| I
+
+	%% Eventos de dominio
+	C -->|user.created, user.phone.verified| K
+	D -->|user.profile.updated| K
+	E -->|user.address.created| K
+	K -->|notify| M
+	M -->|email/sms| J
+	K -->|analytics events| L
+
+	%% Fluxos assincronos complementares
+	E -.->|geocoding async| N
+	N -.->|lat/lon result| E
+	K -->|reprocessamento de falhas| DLQ
+	DLQ -->|retry user.created| D
