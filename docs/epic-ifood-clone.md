@@ -42,8 +42,14 @@ Para garantir que o sistema seja escalável, seguro e resiliente, dividi a arqui
 - Arquitetura orientada a eventos (EDA): uso de mensageria (RabbitMQ ou Apache Kafka) para processar pedidos de forma assíncrona, garantindo que o app não trave se a API do restaurante demorar a responder.
 - Offline-first parcial: o aplicativo do entregador deve armazenar os dados essenciais da rota localmente (SQLite/Room) para o caso de perda de sinal de internet durante o trajeto.
 
-## 3. Próximos Passos Sugeridos
+## 3. Documentacao e proximos passos
 
-- A modelagem do banco de dados (entidades como Usuários, Pedidos e Produtos).
-- A arquitetura de microsserviços ideal para esse cenário.
-- A escolha da stack tecnológica mais eficiente (Node.js, NestJS, Angular, React Native, Flutter, etc.).
+- **Indice da documentacao:** [docs/README.md](./README.md)
+- **Ordem de desenho das jornadas:** [roadmap/ordem-das-jornadas.md](./roadmap/ordem-das-jornadas.md)
+- **Proximo system design:** [02-onboarding-admin](./system-design/02-onboarding-admin/system-design.md)
+
+### Proximos passos tecnicos
+
+- Evoluir esbocos de system design fase a fase (ver roadmap).
+- Consolidar modelagem de dados transversal (Usuarios, Pedidos, Produtos).
+- Definir arquitetura de microsservicos e stack (Node.js, NestJS, etc.).

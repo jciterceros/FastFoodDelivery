@@ -1,5 +1,11 @@
 # System Design - Cadastro de Usuarios (FastFood estilo iFood)
 
+> **Status:** Em progresso  
+> **Fase:** 1
+> **Jornada:** Identidade e usuarios  
+> **Epico:** [1.1 Jornada do Cliente (App Mobile / Web)](../../epic-ifood-clone.md#11-jornada-do-cliente-app-mobile--web)
+> **Dependencias:** nenhuma (define padroes para todos os dominios)
+
 ## 1. Objetivo
 Projetar um sistema de cadastro e gestao de usuarios para uma plataforma de fastfood com alto volume de acessos, cobrindo:
 - Criacao de conta
@@ -74,8 +80,9 @@ flowchart TD
   N -.-> E
 ```
 
-### Acesso ao diagrama da Arquitetura Detalhada
-[Diagrama de arquitetura detalhada](architecture.png)
+### Diagramas
+- [Arquitetura detalhada (Mermaid)](./architecture.mermaid)
+- [Arquitetura detalhada (PNG)](./architecture.png) — exportar do Mermaid quando disponivel
 
 ## 6. Componentes
 ### 6.1 API Gateway

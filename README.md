@@ -14,8 +14,9 @@ O foco do sistema é suportar:
 O projeto está em fase de documentação arquitetural.
 
 Atualmente, a base contém:
-- Documento de system design em `docs/system-design-cadastro-usuarios-fastfood.md`
-- Diagrama técnico em Mermaid em `docs/architecture.mermaid`
+- Hub de documentação em [`docs/README.md`](docs/README.md)
+- Roadmap de jornadas em [`docs/roadmap/ordem-das-jornadas.md`](docs/roadmap/ordem-das-jornadas.md)
+- System designs numerados em [`docs/system-design/`](docs/system-design/) (01 completo, demais em esboço)
 - `package.json` ainda mínimo, sem pipeline de build/test definido
 
 ## Resumo da Arquitetura
@@ -135,8 +136,9 @@ Eventos centrais no barramento:
 6. Definir observabilidade mínima (logs estruturados, métricas e health checks).
 
 ## Referências
-- `docs/system-design-cadastro-usuarios-fastfood.md`
-- `docs/architecture.mermaid`
+- [`docs/README.md`](docs/README.md) — índice completo
+- [`docs/system-design/01-identidade-usuarios/system-design.md`](docs/system-design/01-identidade-usuarios/system-design.md)
+- [`docs/system-design/01-identidade-usuarios/architecture.mermaid`](docs/system-design/01-identidade-usuarios/architecture.mermaid)
 
 ## Licença
 
