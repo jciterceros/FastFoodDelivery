@@ -1,0 +1,12 @@
+{
+  "name": "fastfooddelivery",
+  "displayName": "FastFoodDelivery",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Fernando Flores Terceros",
+  "license": "MIT",
+  "description": "Plataforma de entrega de fast food com foco em cadastro e autenticação de usuários"
+}
