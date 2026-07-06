@@ -1,0 +1,348 @@
+-- =============================================================================
+-- FastFoodDelivery — Seed Data (Dados de Referência)
+-- Database: PostgreSQL 15+
+-- Execute: psql -U postgres -d fastfood -f seed-data.sql
+-- Observação: UUIDs fixos para reprodutibilidade. Em produção, usar
+--            uuid_generate_v4() ou ID sequencial.
+-- =============================================================================
+BEGIN;
+
+-- ============================================================================
+-- 00 — PLATAFORMA TRANSVERSAL
+-- ============================================================================
+
+-- Registro de serviços
+INSERT INTO infra.service_registry (id, service_name, base_url, health_endpoint, health_status, schema_version) VALUES
+    ('00000000-0000-0000-0000-000000000001', 'api-gateway',       'http://gateway:8080', '/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000002', 'auth-service',      'http://auth:8081',   '/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000003', 'user-service',      'http://user:8082',   '/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000004', 'menu-service',      'http://menu:8083',   '/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000005', 'order-service',     'http://order:8084',  '/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000006', 'payment-service',   'http://payment:8085','/health', 'healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000007', 'dispatch-service',  'http://dispatch:8086','/health','healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000008', 'tracking-service',  'http://tracking:8087','/health','healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-000000000009', 'finance-service',   'http://finance:8088','/health','healthy', '1.0.0'),
+    ('00000000-0000-0000-0000-00000000000a', 'notification-service', 'http://notify:8089','/health','healthy', '1.0.0');
+
+-- Regras de rate limit
+INSERT INTO infra.rate_limit_rules (id, route_pattern, limit_per_second, limit_per_minute, limit_per_hour, scope) VALUES
+    ('00000000-0000-0000-0000-000000000010', '/v1/auth/login',          5,  20,  60,   'ip'),
+    ('00000000-0000-0000-0000-000000000011', '/v1/auth/register',       2,  5,   20,   'ip'),
+    ('00000000-0000-0000-0000-000000000012', '/v1/auth/forgot-password',1,  5,   10,   'ip'),
+    ('00000000-0000-0000-0000-000000000013', '/v1/orders',             10,  60,  200,  'user_id'),
+    ('00000000-0000-0000-0000-000000000014', '/v1/payments',           5,  30,  100,  'user_id'),
+    ('00000000-0000-0000-0000-000000000015', '/v1/search/restaurants', 20, 100,  500,  'ip'),
+    ('00000000-0000-0000-0000-000000000016', '/v1/menu/*',             15, 80,  300,  'ip'),
+    ('00000000-0000-0000-0000-000000000017', '/*',                     50, 300, 5000, 'ip');
+
+-- ============================================================================
+-- 01 — IDENTIDADE E USUÁRIOS
+-- ============================================================================
+
+-- Admin da plataforma
+INSERT INTO auth.users (id, email, email_verified_at, phone, password_hash, status) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'admin@fastfood.com.br', NOW(), '+5511999999999',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q',
+     'active');
+
+-- Donos de restaurante
+INSERT INTO auth.users (id, email, email_verified_at, phone, password_hash, status) VALUES
+    ('a0000000-0000-0000-0000-000000000002', 'contato@pizzariabrasa.com.br', NOW(), '+5511988888888',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q', 'active'),
+    ('a0000000-0000-0000-0000-000000000003', 'contato@burguerkingpin.com.br', NOW(), '+5511977777777',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q', 'active'),
+    ('a0000000-0000-0000-0000-000000000004', 'contato@sushimaster.com.br', NOW(), '+5511966666666',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q', 'active');
+
+-- Entregadores
+INSERT INTO auth.users (id, email, email_verified_at, phone, password_hash, status) VALUES
+    ('a0000000-0000-0000-0000-000000000005', 'joao.entregador@email.com.br', NOW(), '+5511955555555',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q', 'active'),
+    ('a0000000-0000-0000-0000-000000000006', 'maria.entregadora@email.com.br', NOW(), '+5511944444444',
+     '$2b$12$LJ3m4ys3Lk0TSwOvY2GpOO8pDWN4WMk7JCk7Pm8Wfm7qF7qF7qF7q', 'active');
+
+-- Perfis
+INSERT INTO "user".user_profiles (user_id, full_name, marketing_opt_in, preferred_language) VALUES
+    ('a0000000-0000-0000-0000-000000000001', 'Admin FastFood',      FALSE, 'pt-BR'),
+    ('a0000000-0000-0000-0000-000000000002', 'Ana Oliveira',        TRUE,  'pt-BR'),
+    ('a0000000-0000-0000-0000-000000000003', 'Carlos Santos',       TRUE,  'pt-BR'),
+    ('a0000000-0000-0000-0000-000000000004', 'Yuki Tanaka',         TRUE,  'pt-BR'),
+    ('a0000000-0000-0000-0000-000000000005', 'João Silva',          TRUE,  'pt-BR'),
+    ('a0000000-0000-0000-0000-000000000006', 'Maria Souza',         TRUE,  'pt-BR');
+
+-- Endereços (admin e donos)
+INSERT INTO "user".user_addresses (id, user_id, label, zip_code, street, number, complement, neighborhood, city, state, latitude, longitude, is_default) VALUES
+    ('a1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Sede',       '01001-000', 'Praça da Sé',         '1',    'Sala 501', 'Sé',         'São Paulo', 'SP', -23.550520, -46.633309, TRUE),
+    ('a1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'Pizzaria',   '04567-000', 'Av. Brigadeiro Faria Lima', '1500', 'Lj 12',   'Pinheiros',  'São Paulo', 'SP', -23.581603, -46.683593, TRUE),
+    ('a1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000003', 'Burguer',    '01311-000', 'Av. Paulista',        '900',   'Lj 3',    'Bela Vista', 'São Paulo', 'SP', -23.561399, -46.656139, TRUE),
+    ('a1000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000004', 'Sushi',      '01414-000', 'Rua Augusta',         '2000',  null,      'Consolação', 'São Paulo', 'SP', -23.558440, -46.665671, TRUE),
+    ('a1000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000005', 'Residencial','08411-000', 'Rua dos Entregadores', '100',   'Casa',    'Guaianases', 'São Paulo', 'SP', -23.541450, -46.411750, TRUE);
+
+-- ============================================================================
+-- 02 — ONBOARDING ADMIN
+-- ============================================================================
+
+-- Applications pré-aprovadas
+INSERT INTO onboarding.onboarding_applications (id, user_id, type, status, submitted_at, reviewed_at, reviewer_id) VALUES
+    ('b1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'restaurant', 'approved', NOW() - INTERVAL '30 days', NOW() - INTERVAL '28 days', 'a0000000-0000-0000-0000-000000000001'),
+    ('b1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'restaurant', 'approved', NOW() - INTERVAL '25 days', NOW() - INTERVAL '23 days', 'a0000000-0000-0000-0000-000000000001'),
+    ('b1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004', 'restaurant', 'approved', NOW() - INTERVAL '20 days', NOW() - INTERVAL '18 days', 'a0000000-0000-0000-0000-000000000001'),
+    ('b1000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005', 'courier',    'approved', NOW() - INTERVAL '15 days', NOW() - INTERVAL '13 days', 'a0000000-0000-0000-0000-000000000001'),
+    ('b1000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000006', 'courier',    'approved', NOW() - INTERVAL '10 days', NOW() - INTERVAL '8 days',  'a0000000-0000-0000-0000-000000000001');
+
+-- Perfis de restaurante
+INSERT INTO onboarding.restaurant_profiles (id, application_id, owner_user_id, legal_name, trading_name, cnpj, cpf_responsavel, address_id, phone, operating_hours_json, status) VALUES
+    ('b0000000-0000-0000-0000-000000000001', 'b1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002',
+     'Pizzaria Brasa Viva Ltda', 'Pizzaria Brasa Viva', '11.222.333/0001-81', '123.456.789-00',
+     'a1000000-0000-0000-0000-000000000002', '+55113030-0001',
+     '{"mon":{"open":"18:00","close":"23:30"},"tue":{"open":"18:00","close":"23:30"},"wed":{"open":"18:00","close":"23:30"},"thu":{"open":"18:00","close":"23:30"},"fri":{"open":"18:00","close":"00:00"},"sat":{"open":"18:00","close":"00:00"},"sun":{"open":"18:00","close":"23:00"}}',
+     'active'),
+    ('b0000000-0000-0000-0000-000000000002', 'b1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003',
+     'King Pin Burguer S.A.', 'Burguer King Pin', '22.333.444/0001-92', '987.654.321-00',
+     'a1000000-0000-0000-0000-000000000003', '+55113030-0002',
+     '{"mon":{"open":"11:00","close":"23:00"},"tue":{"open":"11:00","close":"23:00"},"wed":{"open":"11:00","close":"23:00"},"thu":{"open":"11:00","close":"23:00"},"fri":{"open":"11:00","close":"01:00"},"sat":{"open":"11:00","close":"01:00"},"sun":{"open":"12:00","close":"22:00"}}',
+     'active'),
+    ('b0000000-0000-0000-0000-000000000003', 'b1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004',
+     'Sushi Master Comida Japonesa Ltda', 'Sushi Master', '33.444.555/0001-03', '456.789.123-00',
+     'a1000000-0000-0000-0000-000000000004', '+55113030-0003',
+     '{"mon":{"open":"11:30","close":"22:30"},"tue":{"open":"11:30","close":"22:30"},"wed":{"open":"11:30","close":"22:30"},"thu":{"open":"11:30","close":"22:30"},"fri":{"open":"11:30","close":"23:30"},"sat":{"open":"12:00","close":"23:30"},"sun":{"closed":true}}',
+     'active');
+
+-- Perfis de entregador
+INSERT INTO onboarding.courier_profiles (id, application_id, user_id, vehicle_type, license_number, license_expiry, license_category, vehicle_plate, vehicle_year, vehicle_color, status) VALUES
+    ('c0000000-0000-0000-0000-000000000001', 'b1000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005',
+     'moto', 'SP123456789', '2027-05-15', 'A', 'ABC1D23', 2022, 'Vermelha', 'active'),
+    ('c0000000-0000-0000-0000-000000000002', 'b1000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000006',
+     'moto', 'SP987654321', '2027-08-20', 'A', 'XYZ4E56', 2023, 'Azul',    'active');
+
+-- ============================================================================
+-- 03 — GESTÃO DE CARDÁPIO
+-- ============================================================================
+
+-- Categorias
+INSERT INTO menu.menu_categories (id, restaurant_id, name, description, sort_order) VALUES
+    ('c1000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'Pizzas Salgadas', 'Pizzas tradicionais e especiais', 1),
+    ('c1000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', 'Pizzas Doces',    'Pizzas para sobremesa',           2),
+    ('c1000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', 'Bebidas',         'Refrigerantes, sucos e cervejas', 3),
+    ('c1000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000002', 'Hambúrgueres',   'Artesanais e clássicos',          1),
+    ('c1000000-0000-0000-0000-000000000011', 'b0000000-0000-0000-0000-000000000002', 'Porções',         'Acompanhamentos',                 2),
+    ('c1000000-0000-0000-0000-000000000012', 'b0000000-0000-0000-0000-000000000002', 'Bebidas',         'Bebidas geladas',                 3),
+    ('c1000000-0000-0000-0000-000000000013', 'b0000000-0000-0000-0000-000000000002', 'Sobremesas',      'Doces e milk-shakes',             4),
+    ('c1000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000003', 'Combos',          'Promoções especiais',             1),
+    ('c1000000-0000-0000-0000-000000000021', 'b0000000-0000-0000-0000-000000000003', 'Sushis',          'Nigiri, sashimi e hossomaki',     2),
+    ('c1000000-0000-0000-0000-000000000022', 'b0000000-0000-0000-0000-000000000003', 'Temakis',         'Temakis variados',                3),
+    ('c1000000-0000-0000-0000-000000000023', 'b0000000-0000-0000-0000-000000000003', 'Bebidas',         'Bebidas e saquê',                 4);
+
+-- Itens (Pizzaria Brasa Viva)
+INSERT INTO menu.menu_items (id, category_id, name, description, price_cents, image_url, is_available, preparation_time_seconds, sort_order) VALUES
+    ('c2000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 'Mussarela',        'Molho de tomate, mussarela e orégano',            3299, '/img/pizza-mussarela.jpg',  TRUE, 1800, 1),
+    ('c2000000-0000-0000-0000-000000000002', 'c1000000-0000-0000-0000-000000000001', 'Calabresa',        'Molho de tomate, calabresa, cebola e mussarela',  3499, '/img/pizza-calabresa.jpg',  TRUE, 1800, 2),
+    ('c2000000-0000-0000-0000-000000000003', 'c1000000-0000-0000-0000-000000000001', 'Margherita',       'Molho de tomate, mussarela de búfala, manjericão',3899, '/img/pizza-margherita.jpg', TRUE, 1800, 3),
+    ('c2000000-0000-0000-0000-000000000004', 'c1000000-0000-0000-0000-000000000001', 'Portuguesa',       'Presunto, mussarela, ovo, cebola, pimentão, azeitona',3799, '/img/pizza-portuguesa.jpg',TRUE, 2100, 4),
+    ('c2000000-0000-0000-0000-000000000005', 'c1000000-0000-0000-0000-000000000001', 'Frango com Catupiry','Frango desfiado, catupiry e milho',                3699, '/img/pizza-frango.jpg',     TRUE, 2100, 5),
+    ('c2000000-0000-0000-0000-000000000006', 'c1000000-0000-0000-0000-000000000002', 'Brigadeiro',       'Chocolate, granulado e morango',                  3599, '/img/pizza-brigadeiro.jpg', TRUE, 1800, 1),
+    ('c2000000-0000-0000-0000-000000000007', 'c1000000-0000-0000-0000-000000000002', 'Banana com Canela', 'Banana caramelizada, canela e doce de leite',      3299, '/img/pizza-banana.jpg',     TRUE, 1800, 2),
+    ('c2000000-0000-0000-0000-000000000008', 'c1000000-0000-0000-0000-000000000003', 'Coca-Cola 2L',     'Refrigerante Coca-Cola 2 litros',                 1099, '/img/coca-2l.jpg',          TRUE, 30,   1),
+    ('c2000000-0000-0000-0000-000000000009', 'c1000000-0000-0000-0000-000000000003', 'Suco de Laranja',  'Suco natural 500ml',                              1299, '/img/suco-laranja.jpg',     TRUE, 120,  2),
+    ('c2000000-0000-0000-0000-00000000000a', 'c1000000-0000-0000-0000-000000000003', 'Cerveja Heineken', 'Heineken long neck 330ml',                         899, '/img/heineken.jpg',         TRUE, 30,   3);
+
+-- Itens (Burguer King Pin)
+INSERT INTO menu.menu_items (id, category_id, name, description, price_cents, image_url, is_available, preparation_time_seconds, sort_order) VALUES
+    ('c2000000-0000-0000-0000-000000000010', 'c1000000-0000-0000-0000-000000000010', 'Classic Burger',   'Hambúrguer 160g, cheddar, alface, tomate',           2899, '/img/classic-burger.jpg', TRUE, 900,  1),
+    ('c2000000-0000-0000-0000-000000000011', 'c1000000-0000-0000-0000-000000000010', 'Bacon Burger',     'Hambúrguer 180g, bacon crocante, cheddar, barbecue', 3299, '/img/bacon-burger.jpg',   TRUE, 900,  2),
+    ('c2000000-0000-0000-0000-000000000012', 'c1000000-0000-0000-0000-000000000010', 'King Pin Burger',  'Hambúrguer 220g, onion rings, molho especial, bacon',3899, '/img/kingpin-burger.jpg', TRUE, 1200, 3),
+    ('c2000000-0000-0000-0000-000000000013', 'c1000000-0000-0000-0000-000000000010', 'Veggie Burger',    'Hambúrguer de grão de bico, rúcula, molho iogurte',  2999, '/img/veggie-burger.jpg', TRUE, 900,  4),
+    ('c2000000-0000-0000-0000-000000000014', 'c1000000-0000-0000-0000-000000000011', 'Batata Frita',     'Porção batata frita crocante 300g',                  1499, '/img/batata.jpg',         TRUE, 480,  1),
+    ('c2000000-0000-0000-0000-000000000015', 'c1000000-0000-0000-0000-000000000011', 'Onion Rings',      'Porção onion rings empanados 250g',                 1699, '/img/onion-rings.jpg',    TRUE, 480,  2),
+    ('c2000000-0000-0000-0000-000000000016', 'c1000000-0000-0000-0000-000000000012', 'Coca-Cola Lata',   'Coca-Cola 350ml',                                    699, '/img/coca-lata.jpg',       TRUE, 30,   1),
+    ('c2000000-0000-0000-0000-000000000017', 'c1000000-0000-0000-0000-000000000013', 'Milk Shake',       'Milk shake chocolate 400ml',                        1999, '/img/milkshake.jpg',      TRUE, 300,  1);
+
+-- Itens (Sushi Master)
+INSERT INTO menu.menu_items (id, category_id, name, description, price_cents, image_url, is_available, preparation_time_seconds, sort_order) VALUES
+    ('c2000000-0000-0000-0000-000000000020', 'c1000000-0000-0000-0000-000000000020', 'Combo Master 30',
+     '30 peças: 10 sashimi salmão, 10 hossomaki salmão, 10 uramaki filadélfia', 8999, '/img/combo30.jpg', TRUE, 2400, 1),
+    ('c2000000-0000-0000-0000-000000000021', 'c1000000-0000-0000-0000-000000000020', 'Combo Love 20',
+     '20 peças: 8 nigiri salmão, 6 hossomaki skin, 6 uramaki California',        5999, '/img/combo20.jpg', TRUE, 1800, 2),
+    ('c2000000-0000-0000-0000-000000000022', 'c1000000-0000-0000-0000-000000000021', 'Sashimi Salmão',   '10 fatias de salmão fresco',                        3499, '/img/sashimi-salmao.jpg',TRUE, 900,  1),
+    ('c2000000-0000-0000-0000-000000000023', 'c1000000-0000-0000-0000-000000000021', 'Uramaki Filadélfia','8 peças uramaki salmão e cream cheese',             2999, '/img/uramaki-fila.jpg',  TRUE, 900,  2),
+    ('c2000000-0000-0000-0000-000000000024', 'c1000000-0000-0000-0000-000000000021', 'Nigiri Salmão',    '6 unidades nigiri de salmão',                       2899, '/img/nigiri-salmao.jpg', TRUE, 900,  3),
+    ('c2000000-0000-0000-0000-000000000025', 'c1000000-0000-0000-0000-000000000022', 'Temaki Salmão',    'Temaki salmão com cream cheese',                    2499, '/img/temaki-salmao.jpg', TRUE, 600,  1),
+    ('c2000000-0000-0000-0000-000000000026', 'c1000000-0000-0000-0000-000000000022', 'Temaki Skin',      'Temaki skin com molho teriyaki',                    2299, '/img/temaki-skin.jpg',   TRUE, 600,  2),
+    ('c2000000-0000-0000-0000-000000000027', 'c1000000-0000-0000-0000-000000000023', 'Saquê Quente',     'Saquê tradicional 300ml',                           2599, '/img/saque.jpg',         TRUE, 120,  1);
+
+-- Modificadores (Pizzaria)
+INSERT INTO menu.menu_modifiers (id, item_id, name, min_selections, max_selections, is_required, sort_order) VALUES
+    ('c3000000-0000-0000-0000-000000000001', 'c2000000-0000-0000-0000-000000000001', 'Tamanho', 1, 1, TRUE,  1),
+    ('c3000000-0000-0000-0000-000000000002', 'c2000000-0000-0000-0000-000000000001', 'Borda',   0, 1, FALSE, 2),
+    ('c3000000-0000-0000-0000-000000000003', 'c2000000-0000-0000-0000-000000000002', 'Tamanho', 1, 1, TRUE,  1),
+    ('c3000000-0000-0000-0000-000000000004', 'c2000000-0000-0000-0000-000000000002', 'Borda',   0, 1, FALSE, 2),
+    ('c3000000-0000-0000-0000-000000000005', 'c2000000-0000-0000-0000-000000000003', 'Tamanho', 1, 1, TRUE,  1),
+    ('c3000000-0000-0000-0000-000000000006', 'c2000000-0000-0000-0000-000000000003', 'Borda',   0, 1, FALSE, 2),
+    ('c3000000-0000-0000-0000-000000000007', 'c2000000-0000-0000-0000-000000000004', 'Tamanho', 1, 1, TRUE,  1),
+    ('c3000000-0000-0000-0000-000000000008', 'c2000000-0000-0000-0000-000000000004', 'Borda',   0, 1, FALSE, 2),
+    ('c3000000-0000-0000-0000-000000000009', 'c2000000-0000-0000-0000-000000000005', 'Tamanho', 1, 1, TRUE,  1),
+    ('c3000000-0000-0000-0000-00000000000a', 'c2000000-0000-0000-0000-000000000005', 'Borda',   0, 1, FALSE, 2);
+
+-- Modificadores (Burguer — ponto da carne)
+INSERT INTO menu.menu_modifiers (id, item_id, name, min_selections, max_selections, is_required, sort_order) VALUES
+    ('c3000000-0000-0000-0000-000000000010', 'c2000000-0000-0000-0000-000000000010', 'Ponto da Carne', 1, 1, TRUE, 1),
+    ('c3000000-0000-0000-0000-000000000011', 'c2000000-0000-0000-0000-000000000011', 'Ponto da Carne', 1, 1, TRUE, 1),
+    ('c3000000-0000-0000-0000-000000000012', 'c2000000-0000-0000-0000-000000000012', 'Ponto da Carne', 1, 1, TRUE, 1);
+
+-- Opções (Pizzaria)
+INSERT INTO menu.menu_modifier_options (id, modifier_id, name, price_delta_cents, is_default, sort_order) VALUES
+    ('c4000000-0000-0000-0000-000000000001', 'c3000000-0000-0000-0000-000000000001', 'Pequena (4 fatias)',  0,    TRUE,  1),
+    ('c4000000-0000-0000-0000-000000000002', 'c3000000-0000-0000-0000-000000000001', 'Média (6 fatias)',    600,  FALSE, 2),
+    ('c4000000-0000-0000-0000-000000000003', 'c3000000-0000-0000-0000-000000000001', 'Grande (8 fatias)',   1200, FALSE, 3),
+    ('c4000000-0000-0000-0000-000000000004', 'c3000000-0000-0000-0000-000000000001', 'Gigante (12 fatias)', 2000, FALSE, 4),
+    ('c4000000-0000-0000-0000-000000000010', 'c3000000-0000-0000-0000-000000000002', 'Sem borda recheada',  0,    TRUE,  1),
+    ('c4000000-0000-0000-0000-000000000011', 'c3000000-0000-0000-0000-000000000002', 'Catupiry',           500,  FALSE, 2),
+    ('c4000000-0000-0000-0000-000000000012', 'c3000000-0000-0000-0000-000000000002', 'Cheddar',            500,  FALSE, 3),
+    ('c4000000-0000-0000-0000-000000000013', 'c3000000-0000-0000-0000-000000000002', 'Chocolate',          700,  FALSE, 4);
+
+-- Opções (Burguer)
+INSERT INTO menu.menu_modifier_options (id, modifier_id, name, price_delta_cents, is_default, sort_order) VALUES
+    ('c4000000-0000-0000-0000-000000000020', 'c3000000-0000-0000-0000-000000000010', 'Ao ponto',   0, TRUE,  1),
+    ('c4000000-0000-0000-0000-000000000021', 'c3000000-0000-0000-0000-000000000010', 'Mal passado',0, FALSE, 2),
+    ('c4000000-0000-0000-0000-000000000022', 'c3000000-0000-0000-0000-000000000010', 'Bem passado',0, FALSE, 3);
+
+-- Horários (Pizzaria)
+INSERT INTO menu.restaurant_schedules (id, restaurant_id, day_of_week, open_time, close_time, is_closed) VALUES
+    ('c5000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 0, '18:00', '23:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', 1, '18:00', '23:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', 2, '18:00', '23:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000001', 3, '18:00', '23:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000001', 4, '18:00', '23:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000006', 'b0000000-0000-0000-0000-000000000001', 5, '18:00', '00:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000007', 'b0000000-0000-0000-0000-000000000001', 6, '18:00', '00:00', FALSE);
+
+-- Horários (Burguer)
+INSERT INTO menu.restaurant_schedules (id, restaurant_id, day_of_week, open_time, close_time, is_closed) VALUES
+    ('c5000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000002', 0, '12:00', '22:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000011', 'b0000000-0000-0000-0000-000000000002', 1, '11:00', '23:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000012', 'b0000000-0000-0000-0000-000000000002', 2, '11:00', '23:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000013', 'b0000000-0000-0000-0000-000000000002', 3, '11:00', '23:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000014', 'b0000000-0000-0000-0000-000000000002', 4, '11:00', '23:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000015', 'b0000000-0000-0000-0000-000000000002', 5, '11:00', '01:00', FALSE),
+    ('c5000000-0000-0000-0000-000000000016', 'b0000000-0000-0000-0000-000000000002', 6, '11:00', '01:00', FALSE);
+
+-- Horários (Sushi — fecha domingo)
+INSERT INTO menu.restaurant_schedules (id, restaurant_id, day_of_week, open_time, close_time, is_closed) VALUES
+    ('c5000000-0000-0000-0000-000000000020', 'b0000000-0000-0000-0000-000000000003', 0, '00:00', '00:00', TRUE),
+    ('c5000000-0000-0000-0000-000000000021', 'b0000000-0000-0000-0000-000000000003', 1, '11:30', '22:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000022', 'b0000000-0000-0000-0000-000000000003', 2, '11:30', '22:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000023', 'b0000000-0000-0000-0000-000000000003', 3, '11:30', '22:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000024', 'b0000000-0000-0000-0000-000000000003', 4, '11:30', '22:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000025', 'b0000000-0000-0000-0000-000000000003', 5, '11:30', '23:30', FALSE),
+    ('c5000000-0000-0000-0000-000000000026', 'b0000000-0000-0000-0000-000000000003', 6, '12:00', '23:30', FALSE);
+
+-- ============================================================================
+-- 04 — GEOLOCALIZAÇÃO E COBERTURA
+-- ============================================================================
+
+INSERT INTO coverage.platform_regions (id, name, geometry, is_active) VALUES
+    ('e0000000-0000-0000-0000-000000000001', 'Zona Sul',  ST_MakeEnvelope(-46.7000, -23.6500, -46.5500, -23.5500, 4326), TRUE),
+    ('e0000000-0000-0000-0000-000000000002', 'Zona Norte',ST_MakeEnvelope(-46.6500, -23.5000, -46.5000, -23.4000, 4326), TRUE),
+    ('e0000000-0000-0000-0000-000000000003', 'Centro',    ST_MakeEnvelope(-46.6500, -23.5600, -46.6200, -23.5300, 4326), TRUE);
+
+INSERT INTO coverage.delivery_zones (id, restaurant_id, zone_type, geometry, radius_km, base_fee_cents, additional_fee_per_km_cents, min_order_cents) VALUES
+    ('d0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'radius',
+     ST_SetSRID(ST_MakePoint(-46.683593, -23.581603), 4326), 5.0,  500, 100, 2000),
+    ('d0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', 'radius',
+     ST_SetSRID(ST_MakePoint(-46.683593, -23.581603), 4326), 10.0, 800, 150, 2500),
+    ('d0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000002', 'radius',
+     ST_SetSRID(ST_MakePoint(-46.656139, -23.561399), 4326), 8.0,  400, 100, 1500);
+
+INSERT INTO coverage.delivery_fee_tiers (id, restaurant_id, zone_id, min_distance_km, max_distance_km, fee_cents) VALUES
+    ('d2000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 0.0, 3.0, 500),
+    ('d2000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 3.0, 5.0, 800),
+    ('d2000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002', 0.0, 5.0, 800),
+    ('d2000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002', 5.0, 10.0, 1200);
+
+-- ============================================================================
+-- 08 — SLA CONFIG
+-- ============================================================================
+
+INSERT INTO "order".order_sla_config (id, restaurant_id, preparation_timeout_minutes, pickup_timeout_minutes, auto_cancel_after_minutes) VALUES
+    ('80000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 40, 15, 60),
+    ('80000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 25, 15, 45),
+    ('80000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000003', 35, 15, 50);
+
+-- ============================================================================
+-- 13 — BLOCKLIST
+-- ============================================================================
+
+INSERT INTO rating.moderation_blocklist (id, word, category, is_regex, severity) VALUES
+    ('13000000-0000-0000-0000-000000000001', 'caralho',       'profanity',      FALSE, 'high'),
+    ('13000000-0000-0000-0000-000000000002', 'foda-se',       'profanity',      FALSE, 'high'),
+    ('13000000-0000-0000-0000-000000000003', 'arrombado',     'profanity',      FALSE, 'high'),
+    ('13000000-0000-0000-0000-000000000004', 'golpe',         'fraud',          FALSE, 'critical'),
+    ('13000000-0000-0000-0000-000000000005', 'tel:\\d{4,}',   'personal_info',  TRUE,  'medium'),
+    ('13000000-0000-0000-0000-000000000006', 'whatsapp',      'personal_info',  FALSE, 'medium');
+
+-- ============================================================================
+-- 14 — FINANCEIRO
+-- ============================================================================
+
+INSERT INTO finance.bank_accounts (id, restaurant_id, bank_code, agency, account, account_digit, account_type, pix_key, holder_name, holder_document, holder_type) VALUES
+    ('14000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', '341', '0123', '45678', '9', 'corrente',
+     '11.222.333/0001-81', 'Pizzaria Brasa Viva Ltda', '11.222.333/0001-81', 'juridica'),
+    ('14000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', '237', '0456', '12345', '0', 'corrente',
+     '22.333.444/0001-92', 'King Pin Burguer S.A.',    '22.333.444/0001-92', 'juridica'),
+    ('14000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000003', '001', '0789', '98765', '4', 'corrente',
+     '33.444.555/0001-03', 'Sushi Master Comida Japonesa Ltda', '33.444.555/0001-03', 'juridica');
+
+INSERT INTO finance.payout_config (id, restaurant_id, cycle_days, next_payout_date, min_payout_cents, auto_payout, default_bank_account_id) VALUES
+    ('14000000-0000-0000-0000-000000000010', 'b0000000-0000-0000-0000-000000000001', 7,  DATE '2026-07-14', 5000, TRUE,
+     '14000000-0000-0000-0000-000000000001'),
+    ('14000000-0000-0000-0000-000000000011', 'b0000000-0000-0000-0000-000000000002', 7,  DATE '2026-07-14', 5000, TRUE,
+     '14000000-0000-0000-0000-000000000002'),
+    ('14000000-0000-0000-0000-000000000012', 'b0000000-0000-0000-0000-000000000003', 14, DATE '2026-07-21', 10000, TRUE,
+     '14000000-0000-0000-0000-000000000003');
+
+-- ============================================================================
+-- 15 — CUPONS E CAMPANHAS
+-- ============================================================================
+
+INSERT INTO promotion.campaigns (id, name, description, type, budget_cents, budget_spent_cents, starts_at, ends_at, status, target_metric, roi_goal_percent, created_by) VALUES
+    ('f0000000-0000-0000-0000-000000000001', 'Bem-vindo!',   'Boas-vindas para novos usuários',                   'acquisition', 500000, 0, NOW(), NOW() + INTERVAL '90 days', 'active', 'new_users', 150.00,
+     'a0000000-0000-0000-0000-000000000001'),
+    ('f0000000-0000-0000-0000-000000000002', 'Frete Grátis', 'Frete grátis em pedidos acima de R$ 50',            'engagement',  300000, 0, NOW(), NOW() + INTERVAL '60 days', 'active', 'order_value', 200.00,
+     'a0000000-0000-0000-0000-000000000001'),
+    ('f0000000-0000-0000-0000-000000000003', 'Volta às Aulas','Campanha sazonal período letivo',                  'seasonal',    800000, 0, '2026-08-01', '2026-08-15', 'draft', NULL, NULL,
+     'a0000000-0000-0000-0000-000000000001');
+
+INSERT INTO promotion.coupons (id, code, campaign_id, type, value_percent, max_discount_cents, min_order_cents, max_redemptions, max_per_user, starts_at, ends_at, first_purchase_only, is_active, created_by) VALUES
+    ('f0000000-0000-0000-0000-000000000010', 'BEMVINDO10',  'f0000000-0000-0000-0000-000000000001', 'percent',
+     10.00, 1500, 3000, 1000, 1, NOW(), NOW() + INTERVAL '90 days', TRUE,  TRUE,
+     'a0000000-0000-0000-0000-000000000001'),
+    ('f0000000-0000-0000-0000-000000000011', 'FRETEGRATIS', 'f0000000-0000-0000-0000-000000000002', 'delivery',
+     100.00, 2000, 5000, 500, 1, NOW(), NOW() + INTERVAL '60 days', FALSE, TRUE,
+     'a0000000-0000-0000-0000-000000000001'),
+    ('f0000000-0000-0000-0000-000000000012', 'PIZZA15',     'f0000000-0000-0000-0000-000000000001', 'percent',
+     15.00, 2000, 4000, 300, 3, NOW(), NOW() + INTERVAL '30 days', FALSE, TRUE,
+     'a0000000-0000-0000-0000-000000000002');
+
+INSERT INTO promotion.delivery_fee_rules (id, zone_id, fee_cents, min_order_cents, free_delivery_above_cents, valid_from, valid_to, priority, is_active) VALUES
+    ('15000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 0, 0,    3000, NOW(), NULL, 1, TRUE),
+    ('15000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000002', 0, 3500, 5000, NOW(), NULL, 1, TRUE);
+
+-- ============================================================================
+-- SUMMARY
+-- ============================================================================
+DO $$
+DECLARE
+    table_count INT;
+BEGIN
+    SELECT COUNT(*) INTO table_count FROM (
+        SELECT table_schema, table_name
+        FROM information_schema.tables
+        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+          AND table_type = 'BASE TABLE'
+          AND table_name NOT LIKE '%partition%'
+    ) t;
+    RAISE NOTICE 'Seed carregado: % tabelas populadas', table_count;
+END;
+$$;
+
+COMMIT;
