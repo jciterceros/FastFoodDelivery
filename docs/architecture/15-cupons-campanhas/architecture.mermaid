@@ -1,0 +1,113 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        ADMIN[Painel Admin<br/>Cupons + Campanhas]
+        CLIENT[App Cliente<br/>Aplicar Cupom]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Promotion Service]
+        PS[Promotion Service<br/>CRUD + Validação]
+        VAL[ Coupon Validator<br/>Regras + Elegibilidade]
+        RL_MGR[Rate Limiter<br/>Contador Atômico Redis]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: promotion)]
+        REDIS_CODE[(Redis<br/>Contadores Uso)]
+        REDIS_CACHE[(Redis<br/>Cache Cupons Ativos)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: coupon.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        FINANCE[Financeiro<br/>Subsídio]
+        ANALYTICS[Analytics<br/>ROI Campanhas]
+    end
+
+    %% Fontes
+    subgraph Fontes[Eventos de Entrada]
+        CANCEL["Estados (08)<br/>order.cancelled"]
+    end
+
+    %% Integracoes
+    subgraph Integracoes[Serviços Internos]
+        COVERAGE["Coverage Service (04)<br/>Zonas de Entrega"]
+        CART["Cart/Order Service (06)<br/>Checkout"]
+        USER[User Service<br/>Histórico Cliente]
+    end
+
+    %% Fluxo
+    ADMIN -->|HTTPS| GW
+    CLIENT -->|HTTPS| GW
+
+    GW -->|POST /v1/admin/coupons| PS
+    GW -->|GET /v1/admin/coupons| PS
+    GW -->|POST /v1/cart/apply-coupon| PS
+    GW -->|"POST /v1/coupons/{id}/redeem"| PS
+    GW -->|"GET /v1/admin/campaigns/{id}/stats"| PS
+    GW -->|GET /v1/delivery/fee| PS
+    GW -->|POST /v1/admin/delivery/fee-rules| PS
+
+    %% Promotion Service
+    PS -->|persiste cupons + regras| PG
+    PS -->|INCR contador atômico| REDIS_CODE
+    PS -->|cache cupons ativos| REDIS_CACHE
+    PS -->|valida regras| VAL
+
+    %% Coupon Validator
+    VAL -->|consulta regras| REDIS_CACHE
+    VAL -->|verifica contador| REDIS_CODE
+    VAL -->|fallback leitura| PG
+    VAL -->|consulta frete| COVERAGE
+    VAL -->|verifica first_purchase| USER
+
+    %% Rate Limiter
+    RL_MGR -->|INCR / DECR| REDIS_CODE
+
+    %% Eventos publicados
+    PS -->|coupon.redeemed| RMQ
+
+    %% Eventos consumidos
+    CANCEL -->|order.cancelled| RMQ
+    RMQ -->|order.cancelled| PS
+
+    %% Chama reversão
+    PS -->|reverte INCR no cancelamento| REDIS_CODE
+
+    %% Consumidores downstream
+    RMQ -->|coupon.redeemed| FINANCE
+    RMQ -->|coupon.redeemed| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    PS & PG & REDIS_CODE & REDIS_CACHE -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef source fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef integration fill:#fff8e1,stroke:#f57f17,stroke-width:1px
+
+    class GW,RL gateway
+    class PS,VAL,RL_MGR service
+    class PG,REDIS_CODE,REDIS_CACHE storage
+    class RMQ,DLQ messaging
+    class CANCEL source
+    class COVERAGE,CART,USER integration

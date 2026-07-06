@@ -1,0 +1,127 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        COURIER[App Entregador<br/>Mobile]
+        CLIENT[App Cliente<br/>Acompanhamento]
+        ADMIN[Painel Admin<br/>Auditoria]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Tracking Service]
+        TS[Tracking Service<br/>Ingestão + Milestones]
+        BATCH[Batch Writer<br/>30s / 50 pings]
+        RECON[Reconciliation Job<br/>30min]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: tracking<br/>Particionado por mês)]
+        REDIS_POS[(Redis<br/>Última posição)]
+    end
+
+    %% App local
+    subgraph Local[App Entregador - Offline]
+        SQLITE[(SQLite/Room<br/>Fila de Pings)]
+        ROUTES[(Cached Routes<br/>Endereços)]
+    end
+
+    %% Tempo real
+    subgraph Realtime[Comunicação em Tempo Real]
+        WS[WebSocket Server<br/>Canais por order_id]
+        POLL[Polling Fallback<br/>5s]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: delivery.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        NOTIF[Notification Service<br/>Push para cliente]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fontes de eventos
+    subgraph Fontes[Eventos de Entrada]
+        MATCH[Dispatch Service<br/>delivery.offer.accepted]
+        ORDER[Order Service<br/>order.status.changed]
+    end
+
+    %% Fluxo
+    COURIER -->|HTTPS + WebSocket| GW
+    CLIENT -->|WebSocket + HTTP| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|POST location| TS
+    GW -->|POST milestones| TS
+    GW -->|GET route| TS
+    GW -->|GET tracking| TS
+    GW -->|WS tracking| WS
+
+    %% Tracking Service
+    TS -->|última posição| REDIS_POS
+    TS -->|milestones + rotas| PG
+    TS -->|buffer de pings| BATCH
+    BATCH -->|batch write 30s| PG
+
+    %% App offline
+    COURIER -->|pings offline| SQLITE
+    COURIER -->|rotas cacheadas| ROUTES
+    SQLITE -.->|batch na reconexão| TS
+
+    %% Realtime
+    REDIS_POS -->|posição atual| WS
+    WS -->|push WebSocket| CLIENT
+    CLIENT -.->|fallback polling| POLL
+    POLL -.->|GET tracking| TS
+
+    %% Eventos publicados
+    TS -->|delivery.location.updated| RMQ
+    TS -->|delivery.milestone.reached| RMQ
+
+    %% Eventos consumidos
+    MATCH -->|delivery.offer.accepted| RMQ
+    ORDER -->|order.status.changed| RMQ
+    RMQ -->|delivery.offer.accepted| TS
+    RMQ -->|"order.status.changed (cancelled)"| TS
+
+    %% Consumidores downstream
+    RMQ -->|delivery.location.updated| WS
+    RMQ -->|delivery.milestone.reached| WS
+    RMQ -->|delivery.milestone.reached| NOTIF
+    RMQ -->|delivery.*| ANALYTICS
+
+    %% Reconciliation
+    RECON -->|verifica entregas sem updates| PG
+    RECON -->|solicita sync| COURIER
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    TS & WS & PG & REDIS_POS -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef realtime fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef local fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef source fill:#fff8e1,stroke:#f57f17,stroke-width:1px
+
+    class GW,RL gateway
+    class TS,BATCH,RECON service
+    class PG,REDIS_POS storage
+    class RMQ,DLQ messaging
+    class WS,POLL realtime
+    class SQLITE,ROUTES local
+    class MATCH,ORDER source

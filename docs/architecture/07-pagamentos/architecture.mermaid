@@ -1,0 +1,109 @@
+flowchart TD
+    %% Clientes
+    subgraph Clientes[Usuarios]
+        CLIENT[App Cliente<br/>Pagamento]
+        ADMIN[Painel Admin<br/>Reembolso]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter<br/>3 req/min pagamento]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Payment Service]
+        PS[Payment Service<br/>Cobranca + Webhook]
+        TOKEN[Token Manager<br/>Cartoes tokenizados]
+        RECON[Reconciliacao<br/>Job cron diario]
+    end
+
+    %% Dados
+    subgraph Dados[Persistencia]
+        PG[(PostgreSQL<br/>Schema: payment)]
+    end
+
+    %% Gateway externo
+    subgraph GatewayExterno[Payment Gateway]
+        GATEWAY[Stripe / Adyen<br/>Pix + Cartao + VR]
+        SDK[Stripe Elements<br/>Tokenizacao no frontend]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: payment.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        ORDER[Order Service<br/>Atualizar status]
+        NOTIF[Notification Service<br/>Confirmacao]
+        FIN[Finance Service<br/>Ledger]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fluxo de pagamento
+    CLIENT -.->|dados do cartao<br/>nunca passam pelo backend| SDK
+    SDK -->|token| CLIENT
+    CLIENT -->|"POST /v1/orders/{id}/payments"| GW
+    GW -->|"{ method, token }"| PS
+
+    %% Payment Service -> Gateway
+    PS -->|criar cobranca Pix| GATEWAY
+    PS -->|cobrar com token| GATEWAY
+    PS -->|reembolso| GATEWAY
+    GATEWAY -->|QR code Pix| PS
+
+    %% Webhook
+    GATEWAY -->|webhook + HMAC| PS
+
+    %% Persistencia
+    PS -->|payments + tokens| PG
+    PS -->|webhooks| PG
+
+    %% Reconciliacao
+    RECON -->|comparar| PG
+    RECON -->|extrato| GATEWAY
+
+    %% Eventos
+    PS -->|payment.initiated| RMQ
+    PS -->|payment.paid| RMQ
+    PS -->|payment.failed| RMQ
+    PS -->|payment.refunded| RMQ
+
+    %% Consumidores
+    RMQ -->|payment.paid| ORDER
+    RMQ -->|payment.failed| ORDER
+    RMQ -->|payment.refunded| ORDER
+    RMQ -->|payment.paid, payment.refunded| NOTIF
+    RMQ -->|payment.*| FIN
+    RMQ -->|payment.*| ANALYTICS
+
+    %% Admin
+    ADMIN -->|POST /v1/admin/.../refund| GW
+    GW -->|reembolso| PS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Job polling
+    POLL[Job Polling<br/>5min] -.->|consulta status pendentes| GATEWAY
+
+    %% Observabilidade
+    PS & PG & GATEWAY -->|logs + metricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef external fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 3 3
+    classDef consumer fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class PS,TOKEN,RECON,POLL service
+    class PG storage
+    class RMQ,DLQ messaging
+    class GATEWAY,SDK external
+    class ORDER,NOTIF,FIN,ANALYTICS consumer

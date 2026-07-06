@@ -1,0 +1,100 @@
+flowchart TD
+    %% Clientes
+    subgraph Clientes[Usuarios]
+        CLIENT[App Cliente<br/>Carrinho + Checkout]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter<br/>5 req/min checkout]
+    end
+
+    %% Servicos do dominio
+    subgraph Dominio[Cart & Order Service]
+        CS[Cart Service<br/>Carrinho em Redis]
+        OS[Order Service<br/>Checkout + Estoque]
+        EXP[Job de Expiracao<br/>Cron: 5min]
+    end
+
+    %% Dados
+    subgraph Dados[Persistencia]
+        REDIS[(Redis<br/>Carrinhos + Idempotencia)]
+        PG[(PostgreSQL<br/>Schema: order)]
+    end
+
+    %% Servicos de validacao
+    subgraph Validacao[Servicos de Validacao]
+        MENU[Menu Service<br/>Precos + Disponibilidade]
+        COV[Coverage Service<br/>Frete + Cobertura]
+        PROMO[Promotion Service<br/>Cupom de Desconto]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: order.*, cart.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        PAY[Payment Service<br/>Iniciar pagamento]
+        NOTIF[Notification Service]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fluxo carrinho
+    CLIENT -->|GET /v1/cart, POST /v1/cart/items| GW
+    GW -->|rotas de carrinho| CS
+    CS -->|carrinho| REDIS
+    CS -->|valida restaurant_id| MENU
+
+    %% Fluxo checkout
+    CLIENT -->|POST /v1/orders + Idempotency-Key| GW
+    GW -->|checkout| OS
+    OS -->|le carrinho| REDIS
+    OS -->|valida precos| MENU
+    OS -->|valida frete| COV
+    OS -->|valida cupom| PROMO
+    OS -->|cria pedido + reserva estoque| PG
+    OS -->|remove carrinho| REDIS
+    OS -->|armazena idempotency| REDIS
+
+    %% Expiracao
+    EXP -->|cancela pedidos expirados| PG
+    EXP -->|libera reservas| PG
+    EXP -->|order.cancelled| RMQ
+    EXP -->|cart.abandoned| RMQ
+
+    %% Eventos
+    OS -->|order.created| RMQ
+    OS -->|order.stock.reservation.failed| RMQ
+    OS -->|order.cancelled| RMQ
+    CS -->|cart.abandoned| RMQ
+
+    %% Consumidores
+    RMQ -->|order.created| PAY
+    RMQ -->|order.cancelled| PAY
+    RMQ -->|order.created, order.cancelled| NOTIF
+    RMQ -->|order.*, cart.*| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha apos retries| DLQ
+
+    %% Observabilidade
+    CS & OS & PG & REDIS -->|logs + metricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef validation fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef consumer fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class CS,OS,EXP service
+    class REDIS,PG storage
+    class RMQ,DLQ messaging
+    class MENU,COV,PROMO validation
+    class PAY,NOTIF,ANALYTICS consumer

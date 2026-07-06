@@ -1,0 +1,121 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        PANEL[Painel Restaurante<br/>Web Dashboard]
+        ADMIN[Painel Admin<br/>Financeiro]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Finance Service]
+        FS[Finance Service<br/>Ledger + Repasses]
+        ROLLUP[Rollup Engine<br/>Pré-agregação]
+        PAYOUT[Payout Scheduler<br/>Job 03:00]
+        RECON[Reconciliation Job<br/>Job 04:00]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: finance<br/>Particionado por mês)]
+        REDIS_ROLLUP[(Redis<br/>Rollups Diários)]
+        REDIS_BALANCE[(Redis<br/>Saldo Disponível)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: finance.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        NOTIF[Notification Service<br/>Push: Repasse realizado]
+        ANALYTICS[Analytics]
+        AUDIT[Audit Log]
+    end
+
+    %% Fontes
+    subgraph Fontes[Eventos de Entrada]
+        CONFIRM["Confirmação (12)<br/>delivery.completed"]
+        REFUND["Pagamentos (07)<br/>payment.refunded"]
+        CANCEL["Estados (08)<br/>order.cancelled"]
+        COUPON["Cupons (15)<br/>coupon.redeemed"]
+    end
+
+    %% Provider externo
+    subgraph Externo[Gateway Externo]
+        STRIPE[Stripe / Pix<br/>Transferência Bancária]
+    end
+
+    %% Fluxo
+    PANEL -->|HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|GET /v1/restaurants/me/finance/summary| FS
+    GW -->|GET /v1/restaurants/me/finance/orders| FS
+    GW -->|GET /v1/restaurants/me/finance/payouts| FS
+    GW -->|GET /v1/restaurants/me/finance/reports/export| FS
+    GW -->|GET /v1/admin/finance/reconciliation| FS
+
+    %% Finance Service
+    FS -->|registra lançamentos| PG
+    FS -->|atualiza rollups diários| REDIS_ROLLUP
+    FS -->|saldo disponível| REDIS_BALANCE
+    FS -->|atualiza rollup| ROLLUP
+    FS -->|consulta ledger| PG
+    FS -->|dados do cache| REDIS_ROLLUP
+
+    %% Payout
+    PAYOUT -->|busca pedidos D+7| PG
+    PAYOUT -->|cria repasses| PG
+    PAYOUT -->|chama transferência| STRIPE
+
+    %% Reconciliation
+    RECON -->|soma ledger do dia| PG
+    RECON -->|consulta gateway| STRIPE
+    RECON -->|registra resultado| PG
+
+    %% Eventos publicados
+    FS -->|ledger.entry.created| RMQ
+    FS -->|payout.processed| RMQ
+
+    %% Eventos consumidos
+    CONFIRM -->|delivery.completed| RMQ
+    REFUND -->|payment.refunded| RMQ
+    CANCEL -->|order.cancelled| RMQ
+    RMQ -->|delivery.completed| FS
+    RMQ -->|payment.refunded| FS
+    RMQ -->|order.cancelled| FS
+    RMQ -->|coupon.redeemed| FS
+
+    %% Consumidores downstream
+    RMQ -->|ledger.entry.created| AUDIT
+    RMQ -->|ledger.entry.created| ANALYTICS
+    RMQ -->|payout.processed| NOTIF
+    RMQ -->|payout.processed| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    FS & PG & REDIS_ROLLUP -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef external fill:#ffebee,stroke:#c62828,stroke-width:1px
+    classDef source fill:#fff8e1,stroke:#f57f17,stroke-width:1px
+
+    class GW,RL gateway
+    class FS,ROLLUP,PAYOUT,RECON service
+    class PG,REDIS_ROLLUP,REDIS_BALANCE storage
+    class RMQ,DLQ messaging
+    class STRIPE external
+    class CONFIRM,REFUND,CANCEL,COUPON source

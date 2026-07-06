@@ -1,0 +1,122 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuarios]
+        COURIER[App Entregador<br/>Mobile]
+        ADMIN[Painel Admin<br/>Suporte]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Dispatch Service]
+        DS[Dispatch Service<br/>Matching Engine]
+        ESC[Escalation Monitor<br/>Job cron 2min]
+        OFFER[Offer Manager<br/>Criação/Expiracão]
+        RECON[Reconciliation Job<br/>5min]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: dispatch)]
+        REDIS_GEO[(Redis Geoset<br/>Posições dos Entregadores)]
+        REDIS_LOCK[(Redis Lock<br/>Ofertas Ativas)]
+    end
+
+    %% Notificação
+    subgraph Push[Notificação]
+        PUSH[Push Notification<br/>FCM / APNs]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: delivery.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        ORDER[Order Service<br/>Atualizar status]
+        NOTIF[Notification Service<br/>Push para cliente]
+        TRACK[Tracking Service]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fontes de eventos
+    subgraph Fontes[Eventos de Entrada]
+        ORDER_READY[Order Service<br/>order.pickup.ready]
+        ORDER_CANCEL[Order Service<br/>order.status.changed]
+    end
+
+    %% Fluxo
+    COURIER -->|HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|POST /v1/couriers/me/status| DS
+    GW -->|POST /v1/couriers/me/location| DS
+    GW -->|GET /v1/couriers/me/offers| DS
+    GW -->|"POST /v1/delivery-offers/{id}/accept"| DS
+    GW -->|"POST /v1/delivery-offers/{id}/reject"| DS
+    GW -->|GET /v1/admin/escalation/queue| DS
+
+    %% Dispatch
+    DS -->|GEORADIUS busca entregadores| REDIS_GEO
+    DS -->|GEOADD atualiza posição| REDIS_GEO
+    DS -->|Lua script aceite atômico| REDIS_LOCK
+    DS -->|persiste ofertas + assignments| PG
+    DS -->|cria oferta| OFFER
+
+    %% Escalation
+    ESC -->|pedidos sem matching| PG
+    ESC -->|re-tenta matching| DS
+
+    %% Reconciliation
+    RECON -->|verifica consistência| REDIS_LOCK
+    RECON -->|verifica consistência| PG
+
+    %% Push
+    OFFER -->|enviar notificação| PUSH
+    PUSH -->|push silencioso| COURIER
+
+    %% Eventos publicados
+    DS -->|delivery.offer.created| RMQ
+    DS -->|delivery.offer.accepted| RMQ
+    DS -->|delivery.offer.rejected| RMQ
+    DS -->|delivery.offer.expired| RMQ
+    DS -->|delivery.escalated| RMQ
+
+    %% Eventos consumidos
+    ORDER_READY -->|order.pickup.ready| RMQ
+    ORDER_CANCEL -->|order.status.changed| RMQ
+    RMQ -->|order.pickup.ready| DS
+    RMQ -->|"order.status.changed (cancelled)"| DS
+
+    %% Consumidores downstream
+    RMQ -->|delivery.offer.accepted| ORDER
+    RMQ -->|delivery.offer.accepted| NOTIF
+    RMQ -->|delivery.offer.accepted| TRACK
+    RMQ -->|delivery.*| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    DS & PG & REDIS_GEO & REDIS_LOCK -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef push fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef source fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class DS,ESC,OFFER,RECON service
+    class PG,REDIS_GEO,REDIS_LOCK storage
+    class RMQ,DLQ messaging
+    class PUSH push
+    class ORDER,NOTIF,TRACK,ANALYTICS source

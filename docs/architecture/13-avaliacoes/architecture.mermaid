@@ -1,0 +1,102 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        CLIENT[App Cliente<br/>Avaliação]
+        ADMIN[Painel Admin<br/>Moderação]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Rating Service]
+        RS[Rating Service<br/>Cálculo de Médias]
+        MOD[Moderation Engine<br/>Filtro de Comentários]
+        AGG[Rating Aggregator<br/>Redis Lua Script]
+        RECON[Reconciliation Job<br/>1h]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: rating)]
+        REDIS_AGG[(Redis<br/>Média Agregada)]
+        REDIS_LOCK[(Redis<br/>Lock Atualização)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: rating.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        SEARCH[Search Service<br/>Atualizar ranking]
+        DISPATCH[Dispatch Service<br/>Prioridade matching]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fontes
+    subgraph Fontes[Eventos de Entrada]
+        CONFIRM["Confirmação (12)<br/>delivery.completed"]
+    end
+
+    %% Fluxo
+    CLIENT -->|HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|"POST /v1/orders/{id}/ratings"| RS
+    GW -->|"GET /v1/orders/{id}/ratings"| RS
+    GW -->|"GET /v1/ratings/{type}/{id}"| RS
+    GW -->|"PUT /v1/orders/{id}/ratings/{rid}"| RS
+    GW -->|GET /v1/admin/moderation/queue| RS
+    GW -->|"POST /v1/admin/moderation/{id}/review"| RS
+
+    %% Rating Service
+    RS -->|persiste avaliação| PG
+    RS -->|Lua script atualiza média| REDIS_AGG
+    RS -->|lock de concorrência| REDIS_LOCK
+    RS -->|filtra comentário| MOD
+
+    %% Moderation
+    MOD -->|blocklist + regex| RS
+    MOD -.->|recarrega a cada 5min| PG
+
+    %% Aggregator
+    AGG -->|recalcula médias| PG
+    AGG -->|corrige inconsistências| REDIS_AGG
+
+    %% Eventos publicados
+    RS -->|restaurant.rating.updated| RMQ
+    RS -->|courier.rating.updated| RMQ
+
+    %% Eventos consumidos
+    CONFIRM -->|delivery.completed| RMQ
+    RMQ -->|delivery.completed| RS
+
+    %% Consumidores downstream
+    RMQ -->|*.rating.updated| SEARCH
+    RMQ -->|courier.rating.updated| DISPATCH
+    RMQ -->|*.rating.updated| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    RS & PG & REDIS_AGG -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef source fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class RS,MOD,AGG,RECON service
+    class PG,REDIS_AGG,REDIS_LOCK storage
+    class RMQ,DLQ messaging
+    class CONFIRM source

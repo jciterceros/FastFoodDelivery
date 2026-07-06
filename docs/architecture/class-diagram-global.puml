@@ -1,0 +1,1180 @@
+@startuml FastFoodDelivery_Global_Class_Diagram
+' ============================================================================
+' FastFoodDelivery — Diagrama de Classes Global (PlantUML)
+' Fonte: docs/data-model/er-global.md
+' Geração: automática a partir do catálogo de tabelas e relacionamentos
+' ============================================================================
+
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam packageBorderColor #333333
+skinparam packageFontSize 14
+skinparam packageFontStyle bold
+skinparam class {
+  BorderColor #333333
+  FontName Arial
+  HeaderFontSize 13
+  HeaderFontStyle bold
+}
+
+' ============================================================================
+' LEGENDA
+' ============================================================================
+rectangle Legend [
+  <b>Legenda</b>
+  --
+  PK = Primary Key
+  UK = Unique Key
+  FK = Foreign Key
+  (Redis) = Cache / Volátil
+  * = Campo obrigatório (NOT NULL)
+]
+
+' ============================================================================
+' DOMÍNIO 00 — PLATAFORMA TRANSVERSAL (Schema: infra)
+' ============================================================================
+package "00 — Plataforma Transversal\n(schema: infra)" as P00 {
+  class service_registry << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + service_name: VARCHAR(64) [UK]
+    + base_url: VARCHAR(256)
+    + health_endpoint: VARCHAR(128)
+    + health_status: VARCHAR(16)
+    + last_health_check: TIMESTAMP
+    + schema_version: VARCHAR(16)
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class rate_limit_rules << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + route_pattern: VARCHAR(256)
+    + limit_per_second: INT
+    + limit_per_minute: INT
+    + limit_per_hour: INT
+    + scope: VARCHAR(32)
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class dead_letter_log << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + event_id: UUID
+    + event_type: VARCHAR(64)
+    + source_service: VARCHAR(64)
+    + error_message: TEXT
+    + error_code: VARCHAR(32)
+    + retry_count: INT
+    + payload: JSONB
+    + failed_at: TIMESTAMP
+    + reprocessed_at: TIMESTAMP
+    + status: VARCHAR(16)
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 01 — IDENTIDADE E USUÁRIOS (Schema: auth / user)
+' ============================================================================
+package "01 — Identidade e Usuários\n(schema: auth / user)" as P01 {
+  class users << (T, #E3F2FD) >> {
+    + id: UUID [PK]
+    + email: VARCHAR [UK, NOT NULL]
+    + email_verified_at: TIMESTAMP
+    + phone: VARCHAR
+    + phone_verified_at: TIMESTAMP
+    + password_hash: VARCHAR [NOT NULL]
+    + status: VARCHAR
+    + created_at: TIMESTAMP [NOT NULL]
+    + updated_at: TIMESTAMP [NOT NULL]
+  }
+  note right of users::id
+    Entidade central do ecossistema.
+    Referenciada por 15 tabelas em 8 domínios.
+  end note
+
+  class user_profiles << (T, #E3F2FD) >> {
+    + user_id: UUID [PK, FK] → users.id
+    + full_name: VARCHAR
+    + birth_date: DATE
+    + marketing_opt_in: BOOLEAN
+    + preferred_language: VARCHAR
+    + updated_at: TIMESTAMP
+  }
+
+  class user_addresses << (T, #E3F2FD) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + label: VARCHAR
+    + zip_code: VARCHAR
+    + street: VARCHAR
+    + number: VARCHAR
+    + complement: VARCHAR
+    + neighborhood: VARCHAR
+    + city: VARCHAR
+    + state: VARCHAR
+    + country: VARCHAR
+    + latitude: DECIMAL
+    + longitude: DECIMAL
+    + is_default: BOOLEAN
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class user_consents << (T, #E3F2FD) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + consent_type: VARCHAR
+    + version: VARCHAR
+    + accepted_at: TIMESTAMP
+    + source: VARCHAR
+  }
+
+  class refresh_tokens << (T, #E3F2FD) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + token_hash: VARCHAR
+    + device_id: VARCHAR
+    + expires_at: TIMESTAMP
+    + revoked_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+
+  class user_devices << (T, #E3F2FD) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + device_id: VARCHAR [UK]
+    + platform: VARCHAR
+    + push_token: VARCHAR
+    + last_seen_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 02 — ONBOARDING ADMIN (Schema: onboarding)
+' ============================================================================
+package "02 — Onboarding Admin\n(schema: onboarding)" as P02 {
+  class onboarding_applications << (T, #FFF3E0) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + type: VARCHAR
+    + status: VARCHAR
+    + submitted_at: TIMESTAMP
+    + reviewed_at: TIMESTAMP
+    + reviewer_id: UUID [FK] → users.id
+    + rejection_reason: VARCHAR
+    + rejection_note: TEXT
+    + resubmitted_from: UUID [FK] → onboarding_applications.id
+    + metadata: JSONB
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class application_documents << (T, #FFF3E0) >> {
+    + id: UUID [PK]
+    + application_id: UUID [FK] → onboarding_applications.id
+    + doc_type: VARCHAR
+    + storage_key: VARCHAR
+    + original_filename: VARCHAR
+    + mime_type: VARCHAR
+    + file_size_bytes: INT
+    + checksum: VARCHAR
+    + uploaded_at: TIMESTAMP
+  }
+
+  class restaurant_profiles << (T, #FFF3E0) >> {
+    + id: UUID [PK]
+    + application_id: UUID [FK, UK] → onboarding_applications.id
+    + owner_user_id: UUID [FK] → users.id
+    + legal_name: VARCHAR
+    + trading_name: VARCHAR
+    + cnpj: VARCHAR [UK]
+    + cpf_responsavel: VARCHAR
+    + address_id: UUID [FK] → user_addresses.id
+    + phone: VARCHAR
+    + operating_hours_json: JSONB
+    + status: VARCHAR
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+  note right of restaurant_profiles::id
+    Referenciada por 13 tabelas em 6 domínios.
+  end note
+
+  class courier_profiles << (T, #FFF3E0) >> {
+    + id: UUID [PK]
+    + application_id: UUID [FK, UK] → onboarding_applications.id
+    + user_id: UUID [FK] → users.id
+    + vehicle_type: VARCHAR
+    + license_number: VARCHAR [UK]
+    + license_expiry: DATE
+    + license_category: VARCHAR
+    + vehicle_plate: VARCHAR
+    + vehicle_year: INT
+    + vehicle_color: VARCHAR
+    + status: VARCHAR
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class moderation_audit_log << (T, #FFF3E0) >> {
+    + id: UUID [PK]
+    + application_id: UUID [FK] → onboarding_applications.id
+    + action: VARCHAR
+    + from_status: VARCHAR
+    + to_status: VARCHAR
+    + reviewer_id: UUID [FK] → users.id
+    + comment: TEXT
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 03 — GESTÃO DE CARDÁPIO (Schema: menu)
+' ============================================================================
+package "03 — Gestão de Cardápio\n(schema: menu)" as P03 {
+  class menu_categories << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + name: VARCHAR
+    + description: VARCHAR
+    + sort_order: INT
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class menu_items << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + category_id: UUID [FK] → menu_categories.id
+    + name: VARCHAR
+    + description: TEXT
+    + price_cents: INT
+    + image_url: VARCHAR
+    + is_available: BOOLEAN
+    + preparation_time_seconds: INT
+    + sort_order: INT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class menu_modifiers << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + item_id: UUID [FK] → menu_items.id
+    + name: VARCHAR
+    + min_selections: INT
+    + max_selections: INT
+    + is_required: BOOLEAN
+    + sort_order: INT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class menu_modifier_options << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + modifier_id: UUID [FK] → menu_modifiers.id
+    + name: VARCHAR
+    + price_delta_cents: INT
+    + is_default: BOOLEAN
+    + is_available: BOOLEAN
+    + sort_order: INT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class restaurant_schedules << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + day_of_week: SMALLINT
+    + open_time: TIME
+    + close_time: TIME
+    + is_closed: BOOLEAN
+  }
+
+  class menu_snapshots << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + version: INT
+    + snapshot: JSONB
+    + published_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 04 — GEOLOCALIZAÇÃO E COBERTURA (Schema: coverage)
+' ============================================================================
+package "04 — Geolocalização e Cobertura\n(schema: coverage)" as P04 {
+  class delivery_zones << (T, #E0F2F1) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + zone_type: VARCHAR
+    + geometry: GEOMETRY [GiST]
+    + radius_km: DECIMAL
+    + base_fee_cents: INT
+    + additional_fee_per_km_cents: INT
+    + min_order_cents: INT
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class platform_regions << (T, #E0F2F1) >> {
+    + id: UUID [PK]
+    + name: VARCHAR
+    + geometry: GEOMETRY [GiST]
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+  }
+
+  class coverage_cache << (R, #E0F2F1) >> {
+    + geohash: VARCHAR [PK]
+    + restaurant_ids: UUID[]
+    + platform_region_id: UUID [FK] → platform_regions.id
+    + base_fee_cents: INT
+    + cached_at: TIMESTAMP
+    + expires_at: TIMESTAMP
+  }
+
+  class address_geocoding_cache << (T, #E0F2F1) >> {
+    + id: UUID [PK]
+    + address_hash: VARCHAR [UK]
+    + latitude: DECIMAL
+    + longitude: DECIMAL
+    + formatted_address: VARCHAR
+    + place_id: VARCHAR
+    + provider: VARCHAR
+    + cached_at: TIMESTAMP
+    + expires_at: TIMESTAMP
+  }
+
+  class delivery_fee_tiers << (T, #E0F2F1) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + zone_id: UUID [FK] → delivery_zones.id
+    + min_distance_km: DECIMAL
+    + max_distance_km: DECIMAL
+    + fee_cents: INT
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 05 — BUSCA E FILTROS (Schema: search)
+' ============================================================================
+package "05 — Busca e Filtros\n(schema: search)" as P05 {
+  class restaurant_search_fallback << (T, #EDE7F6) >> {
+    + restaurant_id: UUID [PK, FK] → restaurant_profiles.id
+    + name: VARCHAR
+    + description: TEXT
+    + cuisine_type: VARCHAR
+    + avg_rating: DECIMAL
+    + review_count: INT
+    + delivery_fee_cents: INT
+    + is_open: BOOLEAN
+    + last_menu_version: INT
+    + location: GEOGRAPHY
+    + full_text: TSVECTOR
+  }
+  note right of restaurant_search_fallback
+    Fallback PostgreSQL.
+    O modelo primário é no Elasticsearch
+    (documento restaurant_search_doc).
+  end note
+}
+
+' ============================================================================
+' DOMÍNIO 06 — CARRINHO E PEDIDO (Schema: order)
+' ============================================================================
+package "06 — Carrinho e Pedido\n(schema: order)" as P06 {
+  class orders << (T, #FFEBEE) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + status: VARCHAR
+    + subtotal_cents: INT
+    + delivery_fee_cents: INT
+    + discount_cents: INT
+    + total_cents: INT
+    + promotion_code: VARCHAR
+    + delivery_latitude: DECIMAL
+    + delivery_longitude: DECIMAL
+    + delivery_address_snapshot: JSONB
+    + estimated_minutes: INT
+    + idempotency_key: VARCHAR [UK]
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+  note right of orders::id
+    Agregado central do fluxo transacional.
+    Referenciado por 12 tabelas em 8 domínios.
+  end note
+
+  class order_items << (T, #FFEBEE) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + item_id: UUID [FK] → menu_items.id
+    + name: VARCHAR
+    + quantity: INT
+    + unit_price_cents: INT
+    + modifiers_snapshot: JSONB
+    + total_price_cents: INT
+    + notes: VARCHAR
+  }
+
+  class inventory_reservations << (T, #FFEBEE) >> {
+    + id: UUID [PK]
+    + item_id: UUID [FK] → menu_items.id
+    + order_id: UUID [FK] → orders.id
+    + quantity: INT
+    + status: VARCHAR
+    + expires_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+
+}
+
+' ============================================================================
+' DOMÍNIO 07 — PAGAMENTOS (Schema: payment)
+' ============================================================================
+package "07 — Pagamentos\n(schema: payment)" as P07 {
+  class payments << (T, #E8EAF6) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + method: VARCHAR
+    + amount_cents: INT
+    + status: VARCHAR
+    + gateway: VARCHAR
+    + gateway_payment_id: VARCHAR
+    + gateway_response: JSONB
+    + pix_qr_code: TEXT
+    + pix_qr_text: VARCHAR
+    + pix_expires_at: TIMESTAMP
+    + refunded_cents: INT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class payment_tokens << (T, #E8EAF6) >> {
+    + id: UUID [PK]
+    + user_id: UUID [FK] → users.id
+    + gateway: VARCHAR
+    + gateway_token: VARCHAR [UK]
+    + brand: VARCHAR
+    + last4: VARCHAR
+    + cardholder_name: VARCHAR
+    + exp_month: SMALLINT
+    + exp_year: SMALLINT
+    + is_default: BOOLEAN
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+  }
+
+  class payment_webhooks << (T, #E8EAF6) >> {
+    + id: UUID [PK]
+    + idempotency_key: VARCHAR [UK]
+    + gateway: VARCHAR
+    + event_type: VARCHAR
+    + payload_hash: VARCHAR
+    + raw_payload: JSONB
+    + processed_at: TIMESTAMP
+  }
+
+  class refunds << (T, #E8EAF6) >> {
+    + id: UUID [PK]
+    + payment_id: UUID [FK] → payments.id
+    + amount_cents: INT
+    + reason: VARCHAR
+    + gateway_refund_id: VARCHAR
+    + created_by: UUID [FK] → users.id
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 08 — ESTADOS DO PEDIDO (Schema: order)
+' ============================================================================
+package "08 — Estados do Pedido\n(schema: order)" as P08 {
+  class order_sla_config << (T, #F5F5F5) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK, UK] → restaurant_profiles.id
+    + preparation_timeout_minutes: INT
+    + pickup_timeout_minutes: INT
+    + auto_cancel_after_minutes: INT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class order_status_history << (T, #F5F5F5) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + from_status: VARCHAR
+    + to_status: VARCHAR
+    + changed_by: UUID [FK] → users.id
+    + changed_by_role: VARCHAR
+    + reason: VARCHAR
+    + elapsed_seconds: INT
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 09 — MATCHING ENTREGADOR (Schema: dispatch)
+' ============================================================================
+package "09 — Matching Entregador\n(schema: dispatch)" as P09 {
+  class courier_sessions << (T, #FCE4EC) >> {
+    + id: UUID [PK]
+    + courier_id: UUID [FK, UK] → users.id
+    + is_online: BOOLEAN
+    + current_geohash: VARCHAR
+    + last_lat: DECIMAL
+    + last_lon: DECIMAL
+    + status: VARCHAR
+    + current_delivery_id: UUID [FK] → delivery_assignments.id
+    + battery_level: SMALLINT
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class delivery_offers << (T, #FCE4EC) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + courier_id: UUID [FK] → users.id
+    + attempt: SMALLINT
+    + status: VARCHAR
+    + expires_at: TIMESTAMP
+    + responded_at: TIMESTAMP
+    + rejection_reason: VARCHAR
+    + created_at: TIMESTAMP
+  }
+
+  class delivery_assignments << (T, #FCE4EC) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK, UK] → orders.id
+    + courier_id: UUID [FK] → users.id
+    + offer_id: UUID [FK] → delivery_offers.id
+    + status: VARCHAR
+    + assigned_at: TIMESTAMP
+    + picked_up_at: TIMESTAMP
+    + completed_at: TIMESTAMP
+    + cancelled_at: TIMESTAMP
+    + cancellation_reason: VARCHAR
+  }
+
+  class escalation_queue << (T, #FCE4EC) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK, UK] → orders.id
+    + attempts: SMALLINT
+    + last_attempt_at: TIMESTAMP
+    + escalated_at: TIMESTAMP
+    + status: VARCHAR
+    + resolved_by: UUID [FK] → users.id
+    + resolved_at: TIMESTAMP
+    + notes: TEXT
+  }
+
+  class courier_availability_history << (T, #FCE4EC) >> {
+    + id: UUID [PK]
+    + courier_id: UUID [FK] → users.id
+    + previous_status: VARCHAR
+    + new_status: VARCHAR
+    + reason: VARCHAR
+    + geohash: VARCHAR
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 10 — ROTEIRIZAÇÃO E LOCALIZAÇÃO (Schema: tracking)
+' ============================================================================
+package "10 — Roteirização e Localização\n(schema: tracking)" as P10 {
+  class delivery_tracking << (T, #FFF8E1) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK, UK] → delivery_assignments.id
+    + courier_id: UUID [FK] → users.id
+    + order_id: UUID [FK] → orders.id
+    + current_milestone: VARCHAR
+    + last_lat: DECIMAL
+    + last_lon: DECIMAL
+    + last_geohash: VARCHAR
+    + started_at: TIMESTAMP
+    + picked_up_at: TIMESTAMP
+    + arrived_at: TIMESTAMP
+    + completed_at: TIMESTAMP
+    + estimated_eta: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class location_pings << (T, #FFF8E1) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK] → delivery_assignments.id
+    + courier_id: UUID [FK] → users.id
+    + lat: DECIMAL
+    + lon: DECIMAL
+    + accuracy: SMALLINT
+    + geohash: VARCHAR
+    + battery_level: SMALLINT
+    + recorded_at: TIMESTAMP
+    + ingested_at: TIMESTAMP
+    + source: VARCHAR
+  }
+  note right of location_pings
+    Particionada por mês.
+    Retenção: 90 dias.
+  end note
+
+  class delivery_milestones << (T, #FFF8E1) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK] → delivery_assignments.id
+    + courier_id: UUID [FK] → users.id
+    + milestone: VARCHAR
+    + lat: DECIMAL
+    + lon: DECIMAL
+    + geohash: VARCHAR
+    + source: VARCHAR
+    + created_at: TIMESTAMP
+  }
+
+  class delivery_routes << (T, #FFF8E1) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK, UK] → delivery_assignments.id
+    + pickup_address: VARCHAR
+    + pickup_lat: DECIMAL
+    + pickup_lon: DECIMAL
+    + dropoff_address: VARCHAR
+    + dropoff_lat: DECIMAL
+    + dropoff_lon: DECIMAL
+    + polyline_encoded: TEXT
+    + distance_km: DECIMAL
+    + estimated_duration_minutes: INT
+    + cached_at: TIMESTAMP
+    + expires_at: TIMESTAMP
+  }
+
+  class courier_daily_tracks << (T, #FFF8E1) >> {
+    + id: UUID [PK]
+    + courier_id: UUID [FK] → users.id
+    + date: DATE
+    + total_deliveries: INT
+    + total_distance_km: DECIMAL
+    + total_active_minutes: INT
+    + geohashes_visited: TEXT[]
+    + created_at: TIMESTAMP
+  }
+  note right of courier_daily_tracks
+    Retenção: 1 ano.
+  end note
+}
+
+' ============================================================================
+' DOMÍNIO 11 — RASTREAMENTO TEMPO REAL (Schema: realtime)
+' ============================================================================
+package "11 — Rastreamento Tempo Real\n(schema: realtime)" as P11 {
+  class tracking_sessions << (T, #F1F8E9) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + user_id: UUID [FK] → users.id
+    + device_id: VARCHAR
+    + session_token: VARCHAR [UK]
+    + status: VARCHAR
+    + connected_at: TIMESTAMP
+    + disconnected_at: TIMESTAMP
+    + last_activity_at: TIMESTAMP
+    + messages_sent: INT
+    + ip_address: VARCHAR
+    + user_agent: VARCHAR
+    + created_at: TIMESTAMP
+  }
+
+  class tracking_snapshots << (T, #F1F8E9) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK, UK] → orders.id
+    + courier_lat: DECIMAL
+    + courier_lon: DECIMAL
+    + courier_geohash: VARCHAR
+    + milestone: VARCHAR
+    + milestone_changed_at: TIMESTAMP
+    + estimated_eta: TIMESTAMP
+    + pickup_lat: DECIMAL
+    + pickup_lon: DECIMAL
+    + dropoff_lat: DECIMAL
+    + dropoff_lon: DECIMAL
+    + polyline_encoded: TEXT
+    + version: INT
+    + updated_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 12 — CONFIRMAÇÃO DE ENTREGA (Schema: verification)
+' ============================================================================
+package "12 — Confirmação de Entrega\n(schema: verification)" as P12 {
+  class delivery_verification_codes << (T, #FBE9E7) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK, UK] → delivery_assignments.id
+    + order_id: UUID [FK] → orders.id
+    + code_hash: VARCHAR
+    + code_prefix: VARCHAR
+    + status: VARCHAR
+    + generated_at: TIMESTAMP
+    + expires_at: TIMESTAMP
+    + confirmed_at: TIMESTAMP
+    + confirmed_by_courier_id: UUID [FK] → users.id
+    + confirmed_by_admin_id: UUID [FK] → users.id
+    + revoked_at: TIMESTAMP
+    + revocation_reason: VARCHAR
+  }
+
+  class delivery_verification_attempts << (T, #FBE9E7) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK] → delivery_assignments.id
+    + courier_id: UUID [FK] → users.id
+    + code_submitted: VARCHAR
+    + code_submitted_prefix: VARCHAR
+    + result: VARCHAR
+    + courier_lat: DECIMAL
+    + courier_lon: DECIMAL
+    + geohash: VARCHAR
+    + ip_address: VARCHAR
+    + created_at: TIMESTAMP
+  }
+
+  class delivery_disputes << (T, #FBE9E7) >> {
+    + id: UUID [PK]
+    + delivery_id: UUID [FK, UK] → delivery_assignments.id
+    + order_id: UUID [FK] → orders.id
+    + opened_by: VARCHAR
+    + reason: VARCHAR
+    + status: VARCHAR
+    + resolution: VARCHAR
+    + resolved_by: UUID [FK] → users.id
+    + resolved_at: TIMESTAMP
+    + evidence: JSONB
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 13 — AVALIAÇÕES (Schema: rating)
+' ============================================================================
+package "13 — Avaliações\n(schema: rating)" as P13 {
+  class order_ratings << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + order_id: UUID [FK] → orders.id
+    + user_id: UUID [FK] → users.id
+    + target_type: VARCHAR
+    + target_id: UUID
+    + score: SMALLINT
+    + comment: VARCHAR
+    + comment_status: VARCHAR
+    + moderation_result: JSONB
+    + is_edited: BOOLEAN
+    + edited_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+
+  class rating_aggregates << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + target_type: VARCHAR
+    + target_id: UUID
+    + avg_score: DECIMAL
+    + total_ratings: INT
+    + distribution: JSONB
+    + last_rating_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class moderation_blocklist << (T, #F3E5F5) >> {
+    + id: UUID [PK]
+    + word: VARCHAR [UK]
+    + category: VARCHAR
+    + is_regex: BOOLEAN
+    + severity: VARCHAR
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 14 — PAINEL FINANCEIRO (Schema: finance)
+' ============================================================================
+package "14 — Painel Financeiro\n(schema: finance)" as P14 {
+  class ledger_entries << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + order_id: UUID [FK] → orders.id
+    + entry_type: VARCHAR
+    + amount_cents: INT
+    + description: VARCHAR
+    + reference_id: UUID
+    + reference_type: VARCHAR
+    + status: VARCHAR
+    + settled_at: TIMESTAMP
+    + created_at: TIMESTAMP
+  }
+  note right of ledger_entries
+    Append-only. Particionada por mês.
+  end note
+
+  class daily_restaurant_rollups << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + date: DATE
+    + gross_cents: INT
+    + platform_fees_cents: INT
+    + delivery_fees_cents: INT
+    + net_cents: INT
+    + refunds_cents: INT
+    + adjustments_cents: INT
+    + order_count: INT
+    + payout_status: VARCHAR
+    + payout_id: UUID [FK] → payouts.id
+    + updated_at: TIMESTAMP
+  }
+
+  class payouts << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK] → restaurant_profiles.id
+    + period_start: DATE
+    + period_end: DATE
+    + gross_cents: INT
+    + fees_cents: INT
+    + net_cents: INT
+    + status: VARCHAR
+    + payment_method: VARCHAR
+    + bank_account_id: UUID [FK] → bank_accounts.id
+    + transfer_id: VARCHAR
+    + transferred_at: TIMESTAMP
+    + failure_reason: VARCHAR
+    + created_at: TIMESTAMP
+  }
+
+  class bank_accounts << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK, UK] → restaurant_profiles.id
+    + bank_code: VARCHAR
+    + agency: VARCHAR
+    + account: VARCHAR
+    + account_digit: VARCHAR
+    + account_type: VARCHAR
+    + pix_key: VARCHAR
+    + holder_name: VARCHAR
+    + holder_document: VARCHAR
+    + holder_type: VARCHAR
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+  note right of bank_accounts
+    Dados sensíveis criptografados.
+  end note
+
+  class payout_config << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + restaurant_id: UUID [FK, UK] → restaurant_profiles.id
+    + cycle_days: SMALLINT
+    + next_payout_date: DATE
+    + min_payout_cents: INT
+    + auto_payout: BOOLEAN
+    + default_bank_account_id: UUID [FK] → bank_accounts.id
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class reconciliation_log << (T, #E8F5E9) >> {
+    + id: UUID [PK]
+    + date: DATE [UK]
+    + total_ledger_cents: INT
+    + total_gateway_cents: INT
+    + difference_cents: INT
+    + status: VARCHAR
+    + details: JSONB
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' DOMÍNIO 15 — CUPONS E CAMPANHAS (Schema: promotion)
+' ============================================================================
+package "15 — Cupons e Campanhas\n(schema: promotion)" as P15 {
+  class campaigns << (T, #FFECB3) >> {
+    + id: UUID [PK]
+    + name: VARCHAR
+    + description: TEXT
+    + type: VARCHAR
+    + budget_cents: INT
+    + budget_spent_cents: INT
+    + starts_at: TIMESTAMP
+    + ends_at: TIMESTAMP
+    + status: VARCHAR
+    + target_metric: VARCHAR
+    + roi_goal_percent: DECIMAL
+    + created_by: UUID [FK] → users.id
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class coupons << (T, #FFECB3) >> {
+    + id: UUID [PK]
+    + code: VARCHAR [UK]
+    + campaign_id: UUID [FK] → campaigns.id
+    + type: VARCHAR
+    + value_cents: INT
+    + value_percent: DECIMAL
+    + max_discount_cents: INT
+    + min_order_cents: INT
+    + max_redemptions: INT
+    + max_per_user: INT
+    + starts_at: TIMESTAMP
+    + ends_at: TIMESTAMP
+    + restaurant_scope: VARCHAR
+    + restaurant_ids: UUID[]
+    + region_scope: VARCHAR
+    + region_geohashes: VARCHAR[]
+    + first_purchase_only: BOOLEAN
+    + subsidy_type: VARCHAR
+    + subsidy_platform_percent: DECIMAL
+    + is_active: BOOLEAN
+    + created_by: UUID [FK] → users.id
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class coupon_redemptions << (T, #FFECB3) >> {
+    + id: UUID [PK]
+    + coupon_id: UUID [FK] → coupons.id
+    + user_id: UUID [FK] → users.id
+    + order_id: UUID [FK, UK] → orders.id
+    + discount_cents: INT
+    + original_total_cents: INT
+    + final_total_cents: INT
+    + rules_snapshot: JSONB
+    + subsidy_platform_cents: INT
+    + subsidy_restaurant_cents: INT
+    + created_at: TIMESTAMP
+  }
+
+  class delivery_fee_rules << (T, #FFECB3) >> {
+    + id: UUID [PK]
+    + zone_id: UUID [FK] → delivery_zones.id
+    + region_geometry: JSONB
+    + fee_cents: INT
+    + min_order_cents: INT
+    + free_delivery_above_cents: INT
+    + valid_from: TIMESTAMP
+    + valid_to: TIMESTAMP
+    + priority: INT
+    + is_active: BOOLEAN
+    + created_at: TIMESTAMP
+    + updated_at: TIMESTAMP
+  }
+
+  class campaign_daily_stats << (T, #FFECB3) >> {
+    + id: UUID [PK]
+    + campaign_id: UUID [FK] → campaigns.id
+    + date: DATE
+    + redemptions: INT
+    + discount_cents: INT
+    + gross_order_cents: INT
+    + new_users: INT
+    + created_at: TIMESTAMP
+  }
+}
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 01 (Identidade) → demais domínios
+' ============================================================================
+
+' 01 → 01 (auto-relacionamentos)
+users "1" ||--o| user_profiles : "tem perfil"
+users "1" ||--o{ user_addresses : "tem endereços"
+users "1" ||--o{ user_consents : "aceita termos"
+users "1" ||--o{ refresh_tokens : "possui tokens"
+users "1" ||--o{ user_devices : "usa dispositivos"
+
+' 01 → 02 (Onboarding)
+users "1" ||--o{ onboarding_applications : "solicita"
+users "1" ||--o{ restaurant_profiles : "é dono"
+users "1" ||--o{ courier_profiles : "é entregador"
+users "1" ||--o{ moderation_audit_log : "auditado por"
+
+' 01 → 06 (Pedido)
+users "1" ||--o{ orders : "faz pedidos"
+users "1" ||--o{ order_status_history : "executa transição"
+
+' 01 → 07 (Pagamentos)
+users "1" ||--o{ payment_tokens : "tokeniza cartões"
+users "1" ||--o{ refunds : "criado por admin"
+
+' 01 → 09 (Matching)
+users "1" ||--o{ courier_sessions : "tem sessões"
+users "1" ||--o{ delivery_offers : "recebe ofertas"
+users "1" ||--o{ delivery_assignments : "atribuído"
+users "1" ||--o{ escalation_queue : "resolvido por"
+users "1" ||--o{ courier_availability_history : "tem histórico"
+
+' 01 → 10 (Tracking)
+users "1" ||--o{ delivery_tracking : "rastreado"
+users "1" ||--o{ location_pings : "gera pings"
+users "1" ||--o{ delivery_milestones : "tem marcos"
+users "1" ||--o{ courier_daily_tracks : "agregação"
+
+' 01 → 11 (Realtime)
+users "1" ||--o{ tracking_sessions : "monitora"
+
+' 01 → 12 (Confirmação)
+users "1" ||--o{ delivery_verification_codes : "confirma"
+users "1" ||--o{ delivery_verification_attempts : "tenta confirmar"
+users "1" ||--o{ delivery_disputes : "resolvido por"
+
+' 01 → 13 (Avaliações)
+users "1" ||--o{ order_ratings : "avalia"
+
+' 01 → 15 (Cupons)
+users "1" ||--o{ coupons : "criado por"
+users "1" ||--o{ campaigns : "criado por"
+users "1" ||--o{ coupon_redemptions : "resgata"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 02 (Onboarding) → demais domínios
+' ============================================================================
+
+' 02 → 02 (auto-relacionamentos)
+onboarding_applications "1" ||--o{ application_documents : "anexa"
+onboarding_applications "1" ||--o{ moderation_audit_log : "auditado"
+onboarding_applications "1" }o--|| onboarding_applications : "resubmetido de"
+
+' 02 → 03 (Cardápio)
+restaurant_profiles "1" ||--o{ menu_categories : "tem categorias"
+restaurant_profiles "1" ||--o{ restaurant_schedules : "define horários"
+restaurant_profiles "1" ||--o{ menu_snapshots : "versiona cardápio"
+
+' 02 → 04 (Geolocalização)
+restaurant_profiles "1" ||--o{ delivery_zones : "define cobertura"
+restaurant_profiles "1" ||--o{ delivery_fee_tiers : "define faixas de frete"
+
+' 02 → 05 (Busca)
+restaurant_profiles "1" ||--|| restaurant_search_fallback : "indexado em"
+
+' 02 → 06 (Pedido)
+restaurant_profiles "1" ||--o{ orders : "recebe pedidos"
+restaurant_profiles "1" ||--o{ order_sla_config : "configura SLA"
+
+' 02 → 14 (Financeiro)
+restaurant_profiles "1" ||--o{ ledger_entries : "tem lançamentos"
+restaurant_profiles "1" ||--o{ daily_restaurant_rollups : "tem rollups"
+restaurant_profiles "1" ||--o{ payouts : "recebe repasses"
+restaurant_profiles "1" ||--o{ bank_accounts : "tem conta"
+restaurant_profiles "1" ||--o{ payout_config : "configura payout"
+
+' 02 → 01 (endereço do restaurante)
+user_addresses "1" ||--o{ restaurant_profiles : "endereço"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 03 (Cardápio) → demais domínios
+' ============================================================================
+
+menu_categories "1" ||--o{ menu_items : "contém"
+menu_items "1" ||--o{ menu_modifiers : "tem opções"
+menu_modifiers "1" ||--o{ menu_modifier_options : "tem variações"
+
+' 03 → 06 (Pedido)
+menu_items "1" ||--o{ order_items : "referenciado em pedidos"
+menu_items "1" ||--o{ inventory_reservations : "reservado em"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 04 (Geolocalização) → demais domínios
+' ============================================================================
+
+delivery_zones "1" ||--o{ delivery_fee_tiers : "define faixas"
+platform_regions "1" ||--o{ coverage_cache : "região"
+user_addresses "1" ||--o{ address_geocoding_cache : "geocodificado"
+
+' 04 → 15 (Cupons)
+delivery_zones "1" ||--o{ delivery_fee_rules : "regras de frete"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 06 (Pedido) → demais domínios
+' ============================================================================
+
+orders "1" ||--o{ order_items : "contém itens"
+orders "1" ||--o{ inventory_reservations : "reserva estoque"
+orders "1" ||--o{ order_status_history : "tem histórico"
+
+' 06 → 07 (Pagamentos)
+orders "1" ||--o{ payments : "tem pagamento"
+
+' 06 → 09 (Matching)
+orders "1" ||--o{ delivery_offers : "gera ofertas"
+orders "1" ||--o{ delivery_assignments : "atribuído a"
+orders "1" ||--o{ escalation_queue : "escalado"
+
+' 06 → 11 (Realtime)
+orders "1" ||--o{ tracking_sessions : "monitorado por"
+orders "1" ||--o{ tracking_snapshots : "tem snapshot"
+
+' 06 → 12 (Confirmação)
+orders "1" ||--o{ delivery_verification_codes : "códigos"
+orders "1" ||--o{ delivery_disputes : "disputas"
+
+' 06 → 13 (Avaliações)
+orders "1" ||--o{ order_ratings : "avaliado em"
+
+' 06 → 14 (Financeiro)
+orders "1" ||--o{ ledger_entries : "lançamentos"
+
+' 06 → 15 (Cupons)
+orders "1" ||--o{ coupon_redemptions : "usa cupom"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 07 (Pagamentos) → demais domínios
+' ============================================================================
+
+payments "1" ||--o{ refunds : "tem reembolsos"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 09 (Matching) → DOMÍNIO 10 (Tracking)
+' ============================================================================
+
+delivery_assignments "1" ||--o{ delivery_tracking : "rastreado por"
+delivery_assignments "1" ||--o{ delivery_routes : "tem rota"
+delivery_assignments "1" ||--o{ delivery_verification_codes : "tem código"
+delivery_assignments "1" ||--o{ location_pings : "gera pings"
+delivery_assignments "1" ||--o{ delivery_milestones : "tem marcos"
+
+' 02 → 02 (Onboarding - aplicação vincula perfis)
+onboarding_applications "1" ||--|| restaurant_profiles : "aprovado para"
+onboarding_applications "1" ||--|| courier_profiles : "aprovado para"
+
+' Auto-relacionamento 09
+delivery_assignments "1" ||--o{ courier_sessions : "sessão atual"
+delivery_offers "1" ||--o{ delivery_assignments : "aceito em"
+courier_sessions "1" ||--o{ courier_availability_history : "histórico"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 14 → DOMÍNIO 15
+' ============================================================================
+
+daily_restaurant_rollups "1" ||--o{ payouts : "incluído em"
+payouts "1" ||--o{ bank_accounts : "conta bancária"
+payout_config "1" ||--o{ bank_accounts : "conta padrão"
+
+' ============================================================================
+' RELACIONAMENTOS — DOMÍNIO 15 (Cupons) — auto-relacionamentos
+' ============================================================================
+
+campaigns "1" ||--o{ coupons : "tem cupons"
+campaigns "1" ||--o{ campaign_daily_stats : "tem estatísticas"
+coupons "1" ||--o{ coupon_redemptions : "resgatado em"
+
+' ============================================================================
+' SUMÁRIO RESUMIDO
+' ============================================================================
+note top of P01
+  <size:16><b>FastFoodDelivery — Modelo de Dados Global</b></size>
+  <size:12>64 entidades · 16 domínios · PostgreSQL (schemas) + Redis (cache) + ES (busca)</size>
+  <size:10>Gerado a partir de docs/data-model/er-global.md</size>
+end note
+
+@enduml

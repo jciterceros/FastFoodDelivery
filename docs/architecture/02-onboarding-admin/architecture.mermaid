@@ -1,0 +1,92 @@
+flowchart TD
+    %% Clientes
+    subgraph Clientes[Usuarios e Admins]
+        REST[App Restaurante]
+        COURIER[App Entregador]
+        ADMIN[Painel Admin]
+    end
+
+    %% Gateway
+    subgraph Borda[Borda - API Gateway]
+        GW[API Gateway<br/>Kong]
+        RL[Rate Limiter<br/>3 req/min onboarding]
+    end
+
+    %% Servicos do dominio
+    subgraph Dominio[Onboarding e Moderacao]
+        OS[Onboarding Service<br/>Self-service]
+        MS[Moderation Service<br/>Operacao Interna]
+        SLA[SLA Monitor<br/>Job cron de escalonamento]
+    end
+
+    %% Dados
+    subgraph Dados[Persistencia]
+        PG[(PostgreSQL<br/>Schema: onboarding)]
+        S3[(Object Storage<br/>Documentos criptografados)]
+        CDN[(CDN<br/>Cache de visualizacao)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: onboarding.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Servicos externos
+    subgraph Externos[Downstream]
+        AUTH[Auth Service<br/>Atribuicao de roles]
+        MENU[Menu Service<br/>Habilitar cardapio]
+        NOTIF[Notification Service<br/>Email / Push]
+        ANALYTICS[Analytics / CDP]
+    end
+
+    %% Fluxo de entrada
+    REST & COURIER -->|HTTPS| GW
+    ADMIN -->|HTTPS + MFA| GW
+    GW -->|/v1/onboarding/*| OS
+    GW -->|/v1/admin/*| MS
+
+    %% Onboarding
+    OS -->|solicitacoes| PG
+    OS -->|presigned URL upload| S3
+    OS -.->|verificacao de SLA| SLA
+
+    %% Moderacao
+    MS -->|fila + historico| PG
+    MS -->|visualizar documentos| CDN
+    CDN -.->|cache miss -> origem| S3
+
+    %% Eventos
+    OS -->|onboarding.submitted| RMQ
+    OS -->|onboarding.approved| RMQ
+    OS -->|onboarding.rejected| RMQ
+
+    %% Consumidores
+    RMQ -->|onboarding.submitted| MS
+    RMQ -->|onboarding.approved| AUTH
+    RMQ -->|onboarding.approved| NOTIF
+    RMQ -->|onboarding.approved| MENU
+    RMQ -->|onboarding.*| ANALYTICS
+    RMQ -->|onboarding.rejected| NOTIF
+
+    %% DLQ
+    RMQ -.->|falha apos retries| DLQ
+    DLQ -.->|reprocessamento| RMQ
+
+    %% Observabilidade
+    OS & MS -->|logs + metricas| OBS[Observabilidade<br/>Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef external fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef admin fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray: 5 5
+
+    class GW,RL gateway
+    class OS,MS,SLA service
+    class PG,S3,CDN storage
+    class RMQ,DLQ messaging
+    class AUTH,MENU,NOTIF,ANALYTICS external
+    class ADMIN admin

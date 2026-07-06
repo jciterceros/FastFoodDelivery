@@ -1,0 +1,122 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        CLIENT[App Cliente<br/>Exibe código]
+        COURIER[App Entregador<br/>Digita código]
+        ADMIN[Painel Admin<br/>Disputas]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Delivery Verification Service]
+        DVS[Delivery Verification<br/>Geração + Validação]
+        RL_MGR[Rate Limit Manager<br/>Tentativas + Bloqueio]
+        DISPUTE[Dispute Handler<br/>Evidências + Resolução]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: verification)]
+        REDIS_CODE[(Redis<br/>Hash do Código)]
+        REDIS_ATTEMPT[(Redis<br/>Contador Tentativas)]
+    end
+
+    %% App local
+    subgraph Local[App Entregador - Offline]
+        SQLITE[(SQLite<br/>Pending Confirmations)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: delivery.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        NOTIF[Notification Service<br/>Push: Pedido entregue!]
+        RATING[Rating Service<br/>Iniciar avaliação]
+        FINANCE[Financeiro<br/>Liberar pagamento]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fontes
+    subgraph Fontes[Eventos de Entrada]
+        TRACK[Tracking Service<br/>delivery.milestone.reached]
+        ORDER[Order Service<br/>order.status.changed]
+    end
+
+    %% Fluxo
+    CLIENT -->|HTTPS| GW
+    COURIER -->|HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|"GET /v1/clients/orders/{id}/delivery-code"| DVS
+    GW -->|"POST /v1/deliveries/{id}/confirm"| DVS
+    GW -->|POST /v1/deliveries/confirm/batch| DVS
+    GW -->|"POST /v1/deliveries/{id}/code/reissue"| DVS
+    GW -->|GET /v1/admin/disputes| DVS
+    GW -->|"POST /v1/admin/disputes/{id}/resolve"| DVS
+
+    %% Verification Service
+    DVS -->|gera hash do código| REDIS_CODE
+    DVS -->|controle de tentativas| REDIS_ATTEMPT
+    DVS -->|persiste códigos + tentativas| PG
+    DVS -->|valida hash| REDIS_CODE
+
+    %% Rate limit
+    RL_MGR -->|incrementa tentativas| REDIS_ATTEMPT
+    RL_MGR -->|bloqueio 10min| REDIS_ATTEMPT
+
+    %% Disputas
+    DISPUTE -->|coleta evidências| PG
+    DISPUTE -->|auditoria de geolocalização| PG
+
+    %% App offline
+    COURIER -.->|código hash local| SQLITE
+    SQLITE -.->|batch na reconexão| DVS
+
+    %% Eventos publicados
+    DVS -->|delivery.code.generated| RMQ
+    DVS -->|delivery.completed| RMQ
+    DVS -->|delivery.confirmation.failed| RMQ
+    DVS -->|dispute.resolved| RMQ
+
+    %% Eventos consumidos
+    TRACK -->|delivery.milestone.reached| RMQ
+    ORDER -->|order.status.changed| RMQ
+    RMQ -->|delivery.milestone.reached| DVS
+    RMQ -->|"order.status.changed (cancelled)"| DVS
+
+    %% Consumidores downstream
+    RMQ -->|delivery.completed| NOTIF
+    RMQ -->|delivery.completed| RATING
+    RMQ -->|delivery.completed| FINANCE
+    RMQ -->|delivery.*| ANALYTICS
+    RMQ -->|dispute.resolved| FINANCE
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    DVS & PG & REDIS_CODE & REDIS_ATTEMPT -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef local fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef source fill:#fff8e1,stroke:#f57f17,stroke-width:1px
+
+    class GW,RL gateway
+    class DVS,RL_MGR,DISPUTE service
+    class PG,REDIS_CODE,REDIS_ATTEMPT storage
+    class RMQ,DLQ messaging
+    class SQLITE local
+    class TRACK,ORDER source

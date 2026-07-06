@@ -1,0 +1,112 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuarios]
+        PANEL[Painel Restaurante<br/>Web + WebSocket]
+        CLIENT[App Cliente<br/>Acompanhamento]
+        ADMIN[Painel Admin<br/>Suporte]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servicos do dominio
+    subgraph Dominio[Order Service - Estados]
+        OS[Order Service<br/>Maquina de Estados]
+        AUDIT[Audit Logger<br/>order_status_history]
+        SLA[SLA Monitor<br/>Job cron 2min]
+    end
+
+    %% Dados
+    subgraph Dados[Persistencia]
+        PG[(PostgreSQL<br/>Schema: order)]
+        REDIS[(Redis<br/>Timeouts SLA)]
+    end
+
+    %% Tempo real
+    subgraph Realtime[Comunicacao em Tempo Real]
+        WS[WebSocket Server<br/>Canais por restaurant_id]
+        POLL[Polling Fallback<br/>5s]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: order.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        MATCH[Dispatch Service<br/>Matching ao ficar pronto]
+        NOTIF[Notification Service<br/>Push para cliente]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fontes de eventos
+    subgraph Fontes[Eventos de Entrada]
+        PAY[Payment Service<br/>payment.paid]
+        CART[Cart/Order Service<br/>order.created]
+    end
+
+    %% Fluxo
+    PANEL -->|HTTPS + WebSocket| GW
+    CLIENT -->|HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|GET /v1/restaurants/me/orders| OS
+    GW -->|"POST /v1/orders/{id}/transitions"| OS
+    GW -->|"POST /v1/orders/{id}/cancel"| OS
+
+    %% Maquina de estados
+    OS -->|status + historico| PG
+    OS -->|timeouts SLA| REDIS
+    OS -->|registra transicao| AUDIT
+    AUDIT -->|insert-only| PG
+
+    %% SLA Monitor
+    SLA -->|verifica timeouts| REDIS
+    SLA -->|auto-cancel| OS
+
+    %% Tempo real
+    OS -->|order.status.changed| WS
+    WS -->|push em tempo real| PANEL
+    PANEL -.->|fallback polling| POLL
+    POLL -.->|GET orders| OS
+
+    %% Eventos publicados
+    OS -->|order.status.changed| RMQ
+    OS -->|order.pickup.ready| RMQ
+
+    %% Eventos consumidos
+    PAY -->|payment.paid| RMQ
+    CART -->|order.created| RMQ
+    RMQ -->|payment.paid| OS
+    RMQ -->|order.created| OS
+
+    %% Consumidores
+    RMQ -->|order.ready_for_pickup| MATCH
+    RMQ -->|order.status.changed| NOTIF
+    RMQ -->|order.*| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    OS & WS & PG & REDIS -->|logs + metricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef realtime fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef source fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class OS,AUDIT,SLA service
+    class PG,REDIS storage
+    class RMQ,DLQ messaging
+    class WS,POLL realtime
+    class MATCH,NOTIF,ANALYTICS source

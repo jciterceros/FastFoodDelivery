@@ -1,0 +1,95 @@
+flowchart TD
+    %% Usuarios
+    subgraph Usuarios[Usuários]
+        CLIENT[App Cliente<br/>Web/Mobile]
+        ADMIN[Painel Admin<br/>Suporte]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Realtime Service
+    subgraph Dominio[Realtime Service]
+        RT[Realtime Service<br/>Gerenciamento de Conexões]
+        SM[Session Manager<br/>Sessões WebSocket]
+        BC[Broadcast Engine<br/>Distribuição de Eventos]
+    end
+
+    %% Dados
+    subgraph Dados[Persistência]
+        PG[(PostgreSQL<br/>Schema: realtime)]
+        REDIS_SNAP[(Redis<br/>Snapshots + Sessions)]
+    end
+
+    %% Pub/Sub
+    subgraph PubSub[Redis Pub/Sub]
+        CHANNEL["tracking:order_id<br/>Canais por Pedido"]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: delivery.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Fontes
+    subgraph Fontes[Eventos de Entrada]
+        TRACK[Tracking Service<br/>delivery.location.updated]
+        MILESTONE[Tracking Service<br/>delivery.milestone.reached]
+        ORDER[Order Service<br/>order.status.changed]
+    end
+
+    %% Fluxo
+    CLIENT -->|WebSocket + HTTPS| GW
+    ADMIN -->|HTTPS| GW
+
+    GW -->|"GET /v1/orders/{id}/tracking"| RT
+    GW -->|"WS /v1/orders/{id}/tracking/stream"| RT
+    GW -->|"GET /v1/orders/{id}/tracking/history"| RT
+
+    %% Realtime Service
+    RT -->|gerencia sessões| SM
+    RT -->|publica no canal| CHANNEL
+    RT -->|lê snapshot| REDIS_SNAP
+    RT -->|fallback leitura| PG
+    RT -->|broadcast| BC
+
+    %% Broadcast
+    BC -->|envia para sessões ativas| CLIENT
+    BC -->|consulta sessões ativas| REDIS_SNAP
+
+    %% Eventos consumidos
+    TRACK -->|delivery.location.updated| RMQ
+    MILESTONE -->|delivery.milestone.reached| RMQ
+    ORDER -->|order.status.changed| RMQ
+    RMQ -->|delivery.*| RT
+
+    %% Pub/Sub distribution
+    CHANNEL -.->|distribui entre pods| BC
+
+    %% Fallback
+    CLIENT -.->|polling fallback 5s| GW
+
+    %% DLQ
+    RMQ -.->|falha| DLQ
+
+    %% Observabilidade
+    RT & BC & REDIS_SNAP -->|logs + métricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef pubsub fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef source fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class RT,SM,BC service
+    class PG,REDIS_SNAP storage
+    class RMQ,DLQ messaging
+    class CHANNEL pubsub
+    class TRACK,MILESTONE,ORDER source

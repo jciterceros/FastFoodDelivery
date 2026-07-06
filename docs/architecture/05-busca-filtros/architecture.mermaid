@@ -1,0 +1,99 @@
+flowchart TD
+    %% Clientes
+    subgraph Clientes[Usuarios]
+        CLIENT[App Cliente<br/>Busca + Filtros]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter<br/>60 req/min busca]
+    end
+
+    %% Servicos
+    subgraph Dominio[Search Service]
+        SS[Search Service<br/>Query + Cache + Ranking]
+        SUGGEST[Suggest Engine<br/>Autocomplete]
+        FALLBACK[Fallback Engine<br/>PostgreSQL GIN]
+    end
+
+    %% Indices
+    subgraph Indices[Indices de Busca]
+        ES[(Elasticsearch / OpenSearch<br/>3 shards, 1 replica)]
+        REDIS[(Redis<br/>Cache de queries + sugestoes)]
+    end
+
+    %% Fallback
+    subgraph Fallback[Fallback]
+        PG[(PostgreSQL<br/>Indice GIN + pg_trgm)]
+    end
+
+    %% Eventos e Indexador
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: menu.*, coverage.*, rating.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    subgraph Indexacao[Search Indexer]
+        IDX[Search Indexer<br/>Consumidor de eventos]
+        JOB[Job de Reconciliacao<br/>Cron: 10min]
+    end
+
+    %% Sources de dados
+    subgraph Sources[Fontes de Dados]
+        MENU[Menu Service]
+        COV[Coverage Service]
+        RATING[Rating Service]
+    end
+
+    %% Fluxo de busca
+    CLIENT -->|GET /v1/search/restaurants| GW
+    CLIENT -->|GET /v1/search/suggestions| GW
+    GW -->|busca| SS
+    GW -->|sugestoes| SUGGEST
+
+    %% Cache
+    SS -->|cache hit| REDIS
+    SS -->|cache miss| ES
+    SS -->|fallback| FALLBACK
+    FALLBACK -->|consulta GIN| PG
+    SUGGEST -->|sugestoes| REDIS
+    SUGGEST -.->|miss| ES
+
+    %% Indexacao
+    MENU -->|menu.published, menu.updated, menu.item.unavailable| RMQ
+    COV -->|coverage.zone.updated| RMQ
+    RATING -->|restaurant.rating.updated| RMQ
+    RMQ -->|eventos de cardapio| IDX
+    RMQ -->|eventos de cobertura| IDX
+    RMQ -->|eventos de rating| IDX
+    IDX -->|indexar documento| ES
+    IDX -->|invalidar cache| REDIS
+    IDX -.->|fallback| PG
+
+    %% Reconciliacao
+    JOB -->|comparar versoes| ES
+    JOB -->|consultar versao atual| MENU
+    JOB -.->|reindexar se divergir| IDX
+
+    %% DLQ
+    RMQ -.->|falha apos retries| DLQ
+    DLQ -.->|reprocessar| IDX
+
+    %% Observabilidade
+    SS & SUGGEST & IDX & ES & REDIS -->|logs + metricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef source fill:#e0f2f1,stroke:#00796b,stroke-width:1px
+    classDef indexer fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class SS,SUGGEST,FALLBACK service
+    class ES,REDIS,PG storage
+    class RMQ,DLQ messaging
+    class MENU,COV,RATING source
+    class IDX,JOB indexer

@@ -1,0 +1,238 @@
+flowchart TD
+  %% Arquitetura Geral — Plataforma FastFood (iFood Clone)
+  %% Conexoes entre os 15 dominios, Event Bus, infraestrutura e dependencias externas
+  %%
+  %% Legenda de cores:
+  %%   Azul:   Fase 1 — Identidade e Admin
+  %%   Verde:  Fase 2 — Cardapio, Cobertura, Busca, Carrinho
+  %%   Laranja: Fase 3 — Pagamentos e Estados do Pedido
+  %%   Roxo:   Fase 4 — Entregas
+  %%   Rosa:   Fase 5 — Qualidade e Financas
+  %%   Cinza:  Infraestrutura Compartilhada
+  %% ==================== ESTILOS ====================
+  classDef fase1 fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#0d47a1
+  classDef fase2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+  classDef fase3 fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#bf360c
+  classDef fase4 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+  classDef fase5 fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#880e4f
+  classDef infra fill:#f5f5f5,stroke:#616161,stroke-width:2px,color:#212121
+  classDef externo fill:#fff9c4,stroke:#f9a825,stroke-width:2px,color:#f57f17,stroke-dasharray: 5 5
+  classDef gateway fill:#e0e0e0,stroke:#424242,stroke-width:3px,color:#212121
+  classDef evento fill:transparent,stroke:#90caf9,stroke-width:1px,color:#1565c0,font-size:11px
+  classDef legenda fill:transparent,stroke:none,color:#616161,font-size:11px
+
+  %% ==================== CLIENTES EXTERNOS ====================
+  APP_CLIENT(["📱 App Cliente<br/>Web / Mobile"])
+  APP_COURIER(["📱 App Entregador"])
+  PANEL_REST(["🖥️ Painel Restaurante<br/>Web"])
+  PANEL_ADMIN(["🖥️ Painel Admin"])
+
+  %% ==================== GATEWAY ====================
+  GW(["🔒 API Gateway<br/>Kong"])
+  class GW gateway
+
+  %% ==================== FASE 1: IDENTIDADE E ADMIN ====================
+  subgraph F1["Fase 1 — Identidade e Admin"]
+    AUTH[("🔐 Auth Service<br/>Registro, Login, JWT, OTP")]
+    USER[("👤 User Service<br/>Perfil, Preferencias")]
+    ADDR[("📍 Address Service<br/>Enderecos, Geocoding")]
+    ONB[("📋 Onboarding Service<br/>Solicitacao Restaurante/Entregador")]
+    MOD[("🔍 Moderation Service<br/>Aprovacao/Rejeicao, Auditoria")]
+  end
+  class AUTH,USER,ADDR,ONB,MOD fase1
+
+  %% ==================== FASE 2: CARDAPIO, COBERTURA, BUSCA, CARRINHO ====================
+  subgraph F2["Fase 2 — Cardapio, Cobertura, Busca, Carrinho"]
+    MENU[("📜 Menu Service<br/>Categorias, Itens, Modifiers")]
+    COV[("🗺️ Coverage Service<br/>Zonas, Geohash, Frete")]
+    SEARCH[("🔎 Search Service<br/>Elasticsearch, Cache")]
+    CART[("🛒 Cart Service<br/>Carrinho em Redis")]
+    ORDER_CR[("📦 Order Service<br/>Criacao de Pedido, Checkout")]
+  end
+  class MENU,COV,SEARCH,CART,ORDER_CR fase2
+
+  %% ==================== FASE 3: PAGAMENTOS E ESTADOS ====================
+  subgraph F3["Fase 3 — Pagamentos e Estados"]
+    PAY[("💳 Payment Service<br/>Pix, Cartao, VR, Webhooks")]
+    ORD_ST[("⚙️ Order State Service<br/>Maquina de Estados, SLA")]
+  end
+  class PAY,ORD_ST fase3
+
+  %% ==================== FASE 4: ENTREGAS ====================
+  subgraph F4["Fase 4 — Entregas"]
+    DISP[("🚚 Dispatch Service<br/>Matching, Ofertas, Aceite")]
+    TRACK[("📍 Tracking Service<br/>Pings, Milestones, Rotas")]
+    RT[("📡 Realtime Service<br/>WebSocket para Cliente")]
+    VERIF[("✅ Delivery Verification<br/>Codigo, Disputas")]
+  end
+  class DISP,TRACK,RT,VERIF fase4
+
+  %% ==================== FASE 5: QUALIDADE E FINANCAS ====================
+  subgraph F5["Fase 5 — Qualidade e Financas"]
+    RATING[("⭐ Rating Service<br/>Avaliacoes, Moderacao")]
+    FIN[("💰 Finance Service<br/>Ledger, Rollups, Repasses")]
+    PROMO[("🎯 Promotion Service<br/>Cupons, Campanhas, Frete")]
+  end
+  class RATING,FIN,PROMO fase5
+
+  %% ==================== INFRAESTRUTURA ====================
+  subgraph INFRA["Infraestrutura Compartilhada"]
+    PG[("🐘 PostgreSQL<br/>Schemas por dominio")]
+    REDIS[("⚡ Redis<br/>Cache, Sessoes, Geoset, Pub/Sub")]
+    BUS{{"📨 Event Bus<br/>RabbitMQ"}}
+    ES[("🔎 Elasticsearch<br/>Indice de Busca")]
+  end
+  class PG,REDIS,BUS,ES infra
+
+  %% ==================== DEPENDENCIAS EXTERNAS ====================
+  EXT_GATEWAY(("💳 Gateway Pagamento<br/>Stripe / Adyen"))
+  EXT_PLACES(("🗺️ Google Places API"))
+  EXT_GEO(("🌐 Geocoding Provider<br/>OpenStreetMap"))
+  EXT_NOTIF(("📧 Email / SMS Provider"))
+  EXT_CDN(("☁️ CDN / Object Storage<br/>Imagens, Documentos"))
+  class EXT_GATEWAY,EXT_PLACES,EXT_GEO,EXT_NOTIF,EXT_CDN externo
+
+  %% ==================== CONEXOES DOS CLIENTES AO GATEWAY ====================
+  APP_CLIENT -->|HTTPS + WS| GW
+  APP_COURIER -->|HTTPS| GW
+  PANEL_REST -->|HTTPS + WS| GW
+  PANEL_ADMIN -->|HTTPS| GW
+
+  %% ==================== CONEXOES DO GATEWAY AOS SERVICOS ====================
+  GW -->|/v1/auth/*| AUTH
+  GW -->|/v1/users/*| USER
+  GW -->|/v1/users/me/addresses/*| ADDR
+  GW -->|/v1/onboarding/*| ONB
+  GW -->|/v1/admin/moderation/*| MOD
+  GW -->|/v1/restaurants/*/menu*| MENU
+  GW -->|/v1/coverage/*, /v1/places/*| COV
+  GW -->|/v1/search/*| SEARCH
+  GW -->|/v1/cart/*| CART
+  GW -->|/v1/orders/*| ORDER_CR
+  GW -->|/v1/orders/*/payments*| PAY
+  GW -->|/v1/webhooks/payments/*| PAY
+  GW -->|/v1/restaurants/me/orders/*| ORD_ST
+  GW -->|/v1/couriers/me/*| DISP
+  GW -->|/v1/delivery-offers/*| DISP
+  GW -->|/v1/deliveries/*/location*| TRACK
+  GW -->|/v1/orders/*/tracking*| RT
+  GW -->|/v1/clients/orders/*/delivery-code*| VERIF
+  GW -->|/v1/deliveries/*/confirm*| VERIF
+  GW -->|/v1/ratings/*| RATING
+  GW -->|/v1/restaurants/me/finance/*| FIN
+  GW -->|/v1/admin/finance/*| FIN
+  GW -->|/v1/cart/apply-coupon*| PROMO
+  GW -->|/v1/admin/coupons*| PROMO
+
+  %% ==================== CONEXOES AOS BANCOS ====================
+  AUTH ---|schema: auth| PG
+  AUTH ---|OTP, RateLimit, Blacklist| REDIS
+  USER ---|schema: auth| PG
+  ADDR ---|schema: auth| PG
+  ONB ---|schema: onboarding| PG
+  MOD ---|schema: onboarding| PG
+  MENU ---|schema: menu| PG
+  MENU ---|cardapio cache| REDIS
+  COV ---|schema: coverage| PG
+  COV ---|geohash cache| REDIS
+  SEARCH ---|fallback GIN| PG
+  SEARCH ---|query cache| REDIS
+  SEARCH ---|indice| ES
+  CART ---|carrinho + TTL| REDIS
+  ORDER_CR ---|schema: order| PG
+  ORDER_CR ---|idempotency| REDIS
+  PAY ---|schema: payment| PG
+  ORD_ST ---|schema: order| PG
+  ORD_ST ---|SLA timeouts| REDIS
+  DISP ---|schema: dispatch| PG
+  DISP ---|courier positions + locks| REDIS
+  TRACK ---|schema: tracking| PG
+  TRACK ---|ultima posicao| REDIS
+  RT ---|snapshots + pub/sub| REDIS
+  RT ---|sessoes| PG
+  VERIF ---|schema: delivery| PG
+  VERIF ---|codigo + tentativas| REDIS
+  RATING ---|schema: rating| PG
+  RATING ---|agregados| REDIS
+  FIN ---|schema: finance| PG
+  FIN ---|rollups + saldo| REDIS
+  PROMO ---|schema: promotion| PG
+  PROMO ---|contadores + cache| REDIS
+
+  %% ==================== CONEXOES A DEPENDENCIAS EXTERNAS ====================
+  ADDR -.->|geocoding + autocomplete| EXT_PLACES
+  ADDR -.->|fallback geocoding| EXT_GEO
+  PAY -.->|cobranca + webhook| EXT_GATEWAY
+  ONB -.->|presigned upload| EXT_CDN
+  MENU -.->|presigned upload| EXT_CDN
+
+  %% ==================== EVENT BUS — PUBLICACAO ====================
+  AUTH -->|user.created, user.email.verified<br/>user.phone.verified| BUS
+  USER -->|user.profile.updated, user.deleted| BUS
+  ADDR -->|user.address.created| BUS
+  ONB -->|onboarding.submitted<br/>onboarding.approved, rejected| BUS
+  MENU -->|menu.published, menu.updated<br/>menu.item.unavailable<br/>restaurant.availability.changed| BUS
+  COV -->|coverage.checked<br/>coverage.zone.updated| BUS
+  CART -->|cart.abandoned| BUS
+  ORDER_CR -->|order.created, order.cancelled<br/>order.stock.reservation.failed| BUS
+  PAY -->|payment.initiated, paid, failed, refunded| BUS
+  ORD_ST -->|order.status.changed<br/>order.pickup.ready<br/>order.cancelled| BUS
+  DISP -->|delivery.offer.created, accepted<br/>delivery.offer.rejected, expired<br/>delivery.escalated| BUS
+  TRACK -->|delivery.location.updated<br/>delivery.milestone.reached| BUS
+  VERIF -->|delivery.code.generated<br/>delivery.completed<br/>delivery.confirmation.failed<br/>dispute.resolved| BUS
+  RATING -->|restaurant.rating.updated<br/>courier.rating.updated| BUS
+  FIN -->|ledger.entry.created<br/>payout.processed| BUS
+  PROMO -->|coupon.redeemed| BUS
+
+  %% ==================== EVENT BUS — CONSUMO ====================
+  BUS -->|user.created<br/>user.email.verified| NOTIF(("📧 Notification<br/>Service"))
+  BUS -->|onboarding.approved, rejected| NOTIF
+  BUS -->|order.status.changed<br/>order.pickup.ready<br/>order.cancelled| NOTIF
+  BUS -->|payment.paid, failed, refunded| NOTIF
+  BUS -->|delivery.offer.created<br/>delivery.milestone.reached<br/>delivery.completed<br/>payout.processed| NOTIF
+  BUS -.->|SMS push| EXT_NOTIF
+
+  BUS -->|user.created, user.profile.updated<br/>menu.published, menu.updated| SEARCH
+  BUS -->|menu.item.unavailable<br/>restaurant.availability.changed| SEARCH
+  BUS -->|coverage.zone.updated| SEARCH
+  BUS -->|restaurant.rating.updated<br/>courier.rating.updated| SEARCH
+
+  BUS -->|order.created| PAY
+  BUS -->|order.cancelled| PAY
+
+  BUS -->|order.created<br/>payment.paid, failed| ORD_ST
+  BUS -->|delivery.offer.accepted<br/>delivery.completed| ORD_ST
+  BUS -->|order.cancelled| PROMO
+  BUS -->|delivery.completed| FIN
+  BUS -->|payment.refunded, order.cancelled| FIN
+  BUS -->|coupon.redeemed| FIN
+  BUS -->|delivery.completed| RATING
+
+  BUS -->|order.pickup.ready<br/>order.status.changed| DISP
+
+  BUS -->|delivery.offer.accepted| TRACK
+  BUS -->|order.cancelled| TRACK
+
+  BUS -->|delivery.location.updated<br/>delivery.milestone.reached<br/>order.status.changed| RT
+
+  BUS -->|delivery.milestone.reached| VERIF
+  BUS -->|order.cancelled| VERIF
+
+  BUS -->|onboarding.approved| AUTH
+  BUS -->|menu.item.unavailable| CART
+  BUS -->|restaurant.availability.changed| COV
+
+  %% ==================== LEGENDA ====================
+  subgraph LEGEND["Legenda"]
+    L1["Fase 1 — Identidade e Admin"]:::fase1
+    L2["Fase 2 — Cardápio, Cobertura, Busca, Carrinho"]:::fase2
+    L3["Fase 3 — Pagamentos e Estados do Pedido"]:::fase3
+    L4["Fase 4 — Entregas"]:::fase4
+    L5["Fase 5 — Qualidade e Finanças"]:::fase5
+    LI["Infraestrutura Compartilhada"]:::infra
+    LE["Dependências Externas"]:::externo
+    LFLUXO["─── Fluxo síncrono HTTP (Gateway → Serviço)"]:::legenda
+    LFLUXOB["───── Fluxo assíncrono (Event Bus)"]:::legenda
+    LFLUXOC["- - - Dependência externa / API"]:::legenda
+  end
+  class NOTIF infra

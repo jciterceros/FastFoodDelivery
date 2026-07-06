@@ -1,0 +1,142 @@
+flowchart TD
+    %% Camada de clientes
+    subgraph Clientes[Clientes]
+        Web[App Web]
+        Mobile[App Mobile]
+    end
+
+    %% Camada de borda
+    subgraph Borda[Borda - API Gateway]
+        GW[API Gateway<br/>Kong Open-Source]
+        RL[Rate Limiter<br/>Redis-backed]
+        JWT_V[JWT Validator<br/>Chave Publica em Cache]
+        CORR[Correlation ID<br/>Geracao e Propagacao]
+    end
+
+    %% Servicos de Dominio
+    subgraph Servicos[Servicos de Dominio]
+        AUTH[Auth Service]
+        USER[User Service]
+        ADDR[Address Service]
+        MENU[Menu Service]
+        ORDER[Order Service]
+        PAY[Payment Service]
+        DISP[Dispatch Service]
+        TRACK[Tracking Service]
+        RATE[Rating Service]
+        FIN[Finance Service]
+        PROMO[Promotion Service]
+    end
+
+    %% Persistencia
+    subgraph Persistencia[Persistencia e Cache]
+        PG[(PostgreSQL Primary<br/>Schema: auth, user, order, delivery, payment)]
+        PG_RO[(PostgreSQL Read Replica<br/>Leituras de perfil e relatorios)]
+        REDIS[(Redis<br/>Sessao, Rate Limit, OTP,<br/>Cache, Revogacao)]
+        ES[(Elasticsearch / OpenSearch<br/>Indice de busca)]
+        S3[(Object Storage<br/>Documentos, Imagens de cardapio)]
+    end
+
+    %% Mensageria
+    subgraph Mensageria[Mensageria - Event Bus]
+        RMQ{{RabbitMQ<br/>MVP - Topic Exchange}}
+        QUEUES[Filas por servico<br/>user.*, order.*, delivery.*, payment.*]
+        DLQ[(Dead-Letter Queue<br/>Reprocessamento e Auditoria)]
+    end
+
+    %% Observabilidade
+    subgraph Observabilidade[Observabilidade]
+        LOGS[Logs Estruturados JSON<br/>Elasticsearch + Kibana / Loki]
+        METRICS[Metricas<br/>Prometheus + Grafana]
+        TRACING[Tracing Distribuido<br/>OpenTelemetry + Jaeger]
+        ALERTS[Alertas<br/>PagerDuty / OpsGenie]
+    end
+
+    %% Providers Externos
+    subgraph Externos[Integracoes Externas]
+        EMAIL_SMS[Email/SMS Provider<br/>SendGrid, Twilio]
+        GEO[Geocoding Provider<br/>Google Maps / Here]
+        GATEWAY[Payment Gateway<br/>Stripe / Adyen]
+        PUSH[Push Notification<br/>Firebase / APNs]
+    end
+
+    %% Fluxo principal
+    Web & Mobile -->|HTTPS TLS 1.3| GW
+    GW --> JWT_V
+    JWT_V --> RL
+    
+    %% Roteamento por dominio
+    RL -->|/v1/auth/*| AUTH
+    RL -->|/v1/users/*| USER
+    RL -->|/v1/addresses/*| ADDR
+    RL -->|/v1/menu/*| MENU
+    RL -->|/v1/orders/*| ORDER
+    RL -->|/v1/payments/*| PAY
+    RL -->|/v1/dispatch/*| DISP
+    RL -->|/v1/tracking/*| TRACK
+    RL -->|/v1/ratings/*| RATE
+    RL -->|/v1/finance/*| FIN
+    RL -->|/v1/promotions/*| PROMO
+
+    %% Persistencia
+    AUTH & USER & ADDR & MENU & ORDER & PAY & DISP & TRACK & RATE & FIN & PROMO --> PG
+    USER & MENU & ORDER & RATE & FIN -->|leituras| PG_RO
+    PG -->|streaming replication| PG_RO
+
+    %% Redis
+    AUTH -->|OTP, rate limit, revogacao| REDIS
+    GW -.->|consulta blacklist quando necessario| REDIS
+    ORDER -->|carrinho temporario| REDIS
+    MENU -->|cache de cardapio| REDIS
+    DISP -->|posicoes de entregadores| REDIS
+
+    %% Elasticsearch
+    MENU -->|indexacao| ES
+    PROMO -->|consulta| ES
+
+    %% Object Storage
+    ADDR -.->|upload documentos onboarding| S3
+    MENU -.->|imagens de itens| S3
+
+    %% Event Bus
+    AUTH -->|user.created, user.verified| RMQ
+    USER -->|user.profile.updated| RMQ
+    ADDR -->|user.address.created| RMQ
+    ORDER -->|order.created, order.status.changed| RMQ
+    PAY -->|payment.paid, payment.failed| RMQ
+    DISP -->|delivery.offer.*| RMQ
+    TRACK -->|delivery.location.updated| RMQ
+    RATE -->|rating.submitted| RMQ
+    FIN -->|consumo de eventos financeiros| RMQ
+    PROMO -->|coupon.redeemed| RMQ
+
+    RMQ --> QUEUES
+    QUEUES -->|falha apos N retries| DLQ
+    DLQ -->|reprocessamento automatico| QUEUES
+
+    %% Integracoes externas
+    AUTH -->|evento -> notificacao| EMAIL_SMS
+    ADDR -.->|geocoding assincrono| GEO
+    PAY -->|cobranca / webhook| GATEWAY
+    DISP -->|push de oferta| PUSH
+
+    %% Observabilidade
+    GW & AUTH & USER & ADDR & MENU & ORDER & PAY & DISP & TRACK & RATE & FIN & PROMO -->|logs JSON| LOGS
+    GW & AUTH & USER & ADDR & MENU & ORDER & PAY & DISP & TRACK & RATE & FIN & PROMO -->|metricas| METRICS
+    GW & AUTH & USER & ADDR & MENU & ORDER & PAY & DISP & TRACK & RATE & FIN & PROMO -->|spans| TRACING
+    DLQ -.->|alerta de acumulo| ALERTS
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef observability fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef external fill:#f5f5f5,stroke:#616161,stroke-width:1px,stroke-dasharray: 3 3
+
+    class GW,JWT_V,RL,CORR gateway
+    class AUTH,USER,ADDR,MENU,ORDER,PAY,DISP,TRACK,RATE,FIN,PROMO service
+    class PG,PG_RO,REDIS,ES,S3 storage
+    class RMQ,QUEUES,DLQ messaging
+    class LOGS,METRICS,TRACING,ALERTS observability
+    class EMAIL_SMS,GEO,GATEWAY,PUSH external

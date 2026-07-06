@@ -1,0 +1,98 @@
+flowchart TD
+    %% Clientes
+    subgraph Usuarios[Usuarios]
+        PANEL[Painel Restaurante<br/>Web]
+        CLIENT[App Cliente<br/>Visualizacao]
+    end
+
+    %% Gateway
+    subgraph Borda[API Gateway]
+        GW[Kong Gateway]
+        RL[Rate Limiter]
+    end
+
+    %% Servico principal
+    subgraph Dominio[Menu Service]
+        MS[Menu Service<br/>CRUD + Validacao]
+        PUBLISH[Publish Engine<br/>Snapshot + Validacao]
+        IMG[Image Manager<br/>Upload + CDN]
+        SCHED[Schedule Engine<br/>Abertura/Fechamento]
+    end
+
+    %% Dados
+    subgraph Dados[Persistencia]
+        PG[(PostgreSQL<br/>Schema: menu)]
+        REDIS[(Redis<br/>Cache cardapio)]
+        CDN[(CDN<br/>Imagens de itens)]
+    end
+
+    %% Eventos
+    subgraph Eventos[Event Bus]
+        RMQ{{RabbitMQ<br/>Topic: menu.*}}
+        DLQ[(Dead-Letter Queue)]
+    end
+
+    %% Consumidores
+    subgraph Consumidores[Downstream]
+        SEARCH[Search Indexer<br/>Elasticsearch]
+        CART[Cart Service<br/>Remocao de itens]
+        NOTIF[Notification Service]
+        ANALYTICS[Analytics]
+    end
+
+    %% Fluxo painel restaurante
+    PANEL -->|HTTPS| GW
+    GW -->|/v1/restaurants/me/menu/*| MS
+    GW -->|/v1/restaurants/me/schedules| SCHED
+
+    %% Fluxo cliente
+    CLIENT -->|"GET /v1/restaurants/{id}/menu"| GW
+    GW -->|leitura| REDIS
+    REDIS -.->|miss -> banco| MS
+    REDIS -.->|cache warming| CDN
+
+    %% Publicacao
+    MS -->|draft| PG
+    MS -->|criar snapshot| PUBLISH
+    PUBLISH -->|versionado| PG
+    PUBLISH -->|invalidate| REDIS
+    PUBLISH -->|menu.published| RMQ
+
+    %% Pausa em tempo real
+    MS -->|menu.item.unavailable| RMQ
+    MS -->|is_available update| PG
+    MS -->|invalidate cache| REDIS
+
+    %% Schedule
+    SCHED -->|abre/fecha| PG
+    SCHED -->|restaurant.availability.changed| RMQ
+
+    %% Imagens
+    IMG -->|upload presigned URL| CDN
+    IMG -->|on image uploaded| MS
+
+    %% Consumidores de eventos
+    RMQ -->|menu.published, menu.updated| SEARCH
+    RMQ -->|menu.item.unavailable| CART
+    RMQ -->|restaurant.availability.changed| NOTIF
+    RMQ -->|menu.*| ANALYTICS
+
+    %% DLQ
+    RMQ -.->|falha apos retries| DLQ
+    DLQ -.->|reprocess| RMQ
+
+    %% Observabilidade
+    MS & PUBLISH & SCHED & REDIS -->|logs + metricas| OBS[Grafana / Prometheus]
+
+    %% Estilos
+    classDef gateway fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef service fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    classDef storage fill:#fff3e0,stroke:#f57c00,stroke-width:1px
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:1px
+    classDef consumer fill:#fce4ec,stroke:#c62828,stroke-width:1px
+
+    class GW,RL gateway
+    class MS,PUBLISH,IMG,SCHED service
+    class PG,REDIS,CDN storage
+    class RMQ,DLQ messaging
+    class SEARCH,CART,NOTIF,ANALYTICS consumer
