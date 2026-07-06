@@ -46,7 +46,7 @@ Para garantir que o sistema seja escalável, seguro e resiliente, dividi a arqui
 
 - **Indice da documentacao:** [docs/README.md](./README.md)
 - **Ordem de desenho das jornadas:** [roadmap/ordem-das-jornadas.md](./roadmap/ordem-das-jornadas.md)
-- **Proximo system design:** [02-onboarding-admin](./system-design/02-onboarding-admin/system-design.md)
+- **Proximo system design:** [02-onboarding-admin](./architecture/02-onboarding-admin/system-design.md)
 
 ### Proximos passos tecnicos
 
