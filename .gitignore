@@ -2,8 +2,7 @@
 # Instruções locais (não versionar)
 # =============================================================================
 .github/copilot-instructions.md
-.github/copilot-instructions.md.bak
-
+.github/prompts/
 # =============================================================================
 # Dependências e build (Node.js / TypeScript)
 # =============================================================================
@@ -12,6 +11,11 @@ dist/
 build/
 out/
 *.tsbuildinfo
+
+# =============================================================================
+# Scripts e dependências (Python)
+# =============================================================================
+scripts/
 
 # =============================================================================
 # Variáveis de ambiente e segredos
@@ -39,9 +43,9 @@ coverage/
 Thumbs.db
 Desktop.ini
 
+.vscode/
 .vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json.example
+.vscode/extensions.json
 
 .idea/
 *.swp
