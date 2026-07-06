@@ -1,0 +1,5653 @@
+openapi: "3.1.0"
+info:
+  title: FastFood Delivery - API Consolidada
+  description: |
+    Especificação OpenAPI 3.1 consolidando todos os endpoints dos 16 domínios
+    do sistema de delivery iFood-like.
+
+    **Dominios:**
+    - 00: Plataforma Transversal (health, ready)
+    - 01: Identidade e Usuários (auth, perfil, endereços)
+    - 02: Onboarding Admin (restaurantes, entregadores, moderação)
+    - 03: Gestão de Cardápio (categorias, itens, modificadores, horários)
+    - 04: Geolocalização e Cobertura (cobertura, autocomplete, zonas)
+    - 05: Busca e Filtros (busca full-text, sugestões)
+    - 06: Carrinho e Pedido (carrinho, checkout)
+    - 07: Pagamentos (Pix, cartão, webhook, reembolso)
+    - 08: Estados do Pedido (transições, SLA, timeline)
+    - 09: Matching e Aceite (entregador online/offline, ofertas)
+    - 10: Roteirização e Localização (pings, milestones, rotas)
+    - 11: Rastreamento Tempo Real (WebSocket, snapshot)
+    - 12: Confirmação de Entrega (código, disputas)
+    - 13: Avaliações (ratings, moderação)
+    - 14: Painel Financeiro (ledger, repasses, relatórios)
+    - 15: Cupons e Campanhas (cupons, campanhas, frete dinâmico)
+  version: "1.0.0"
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+  contact:
+    name: FastFood Delivery Team
+
+servers:
+  - url: https://api.fastfood.example.com/v1
+    description: Produção
+  - url: https://staging-api.fastfood.example.com/v1
+    description: Staging
+
+
+security:
+  - BearerAuth: []
+paths:
+  # ===================================================================
+  # 00 - PLATAFORMA TRANSVERSAL
+  # ===================================================================
+  /health:
+    get:
+      tags: [Plataforma Transversal]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Serviço saudável
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheckResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /ready:
+    get:
+      tags: [Plataforma Transversal]
+      summary: Ready check
+      operationId: readyCheck
+      responses:
+        "200":
+          description: Serviço pronto para tráfego
+        "503":
+          description: Serviço ainda inicializando
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 01 - IDENTIDADE E USUÁRIOS
+  # ===================================================================
+  /auth/register:
+    post:
+      tags: [Identidade]
+      summary: Registrar novo usuário
+      operationId: authRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "409":
+          description: Email já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/login:
+    post:
+      tags: [Identidade]
+      summary: Login do usuário
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login bem-sucedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Credenciais inválidas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/refresh:
+    post:
+      tags: [Identidade]
+      summary: Renovar access token
+      operationId: authRefresh
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/forgot-password:
+    post:
+      tags: [Identidade]
+      summary: Solicitar reset de senha
+      operationId: authForgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: "ana.souza@example.com"
+                  format: email
+              required: [email]
+      responses:
+        "200":
+          description: Email de recuperação enviado (resposta idêntica independente de existência)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Se o email existir, você receberá instruções de recuperação.
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/reset-password:
+    post:
+      tags: [Identidade]
+      summary: Redefinir senha com token
+      operationId: authResetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  example: "SenhaForte123!"
+                  minLength: 8
+              required: [token, newPassword]
+      responses:
+        "200":
+          description: Senha redefinida com sucesso
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/logout:
+    post:
+      tags: [Identidade]
+      summary: Logout (revogar refresh token)
+      operationId: authLogout
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Logout realizado
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /auth/verify-email:
+    post:
+      tags: [Identidade]
+      summary: Confirmar email
+      operationId: authVerifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+              required: [token]
+      responses:
+        "200":
+          description: Email verificado com sucesso
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/me:
+    get:
+      tags: [Identidade]
+      summary: Obter perfil do usuário autenticado
+      operationId: getUserProfile
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Perfil do usuário
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    patch:
+      tags: [Identidade]
+      summary: Atualizar perfil do usuário
+      operationId: updateUserProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                  example: "Ana Souza"
+                birthDate:
+                  type: string
+                  example: "1990-05-15"
+                  format: date
+                marketingOptIn:
+                  type: boolean
+                  example: true
+      responses:
+        "200":
+          description: Perfil atualizado
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/me/addresses:
+    get:
+      tags: [Identidade]
+      summary: Listar endereços do usuário
+      operationId: listAddresses
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de endereços
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Address"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      tags: [Identidade]
+      summary: Criar novo endereço
+      operationId: createAddress
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAddressRequest"
+      responses:
+        "201":
+          description: Endereço criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Address"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /users/me/addresses/{addressId}:
+    patch:
+      tags: [Identidade]
+      summary: Atualizar endereço
+      operationId: updateAddress
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  example: "casa"
+                  enum: [casa, trabalho, outro]
+                zipCode:
+                  type: string
+                  example: "01304-001"
+                street:
+                  type: string
+                  example: "Rua Augusta"
+                number:
+                  type: string
+                  example: "1500"
+                complement:
+                  type: string
+                  example: "Apto 42"
+                neighborhood:
+                  type: string
+                  example: "Consolação"
+                city:
+                  type: string
+                  example: "São Paulo"
+                state:
+                  type: string
+                  example: "SP"
+                isDefault:
+                  type: boolean
+                  example: true
+      responses:
+        "200":
+          description: Endereço atualizado
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      tags: [Identidade]
+      summary: Excluir endereço
+      operationId: deleteAddress
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: addressId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Endereço excluído
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 02 - ONBOARDING ADMIN
+  # ===================================================================
+  /onboarding/restaurants:
+    post:
+      tags: [Onboarding]
+      summary: Criar solicitação de restaurante
+      operationId: createOnboardingRestaurant
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingRestaurantRequest"
+      responses:
+        "201":
+          description: Solicitação criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /onboarding/couriers:
+    post:
+      tags: [Onboarding]
+      summary: Criar solicitação de entregador
+      operationId: createOnboardingCourier
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingCourierRequest"
+      responses:
+        "201":
+          description: Solicitação criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /onboarding/applications/{id}:
+    get:
+      tags: [Onboarding]
+      summary: Obter status da solicitação
+      operationId: getOnboardingApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Status da solicitação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applicationId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  type:
+                    type: string
+                    enum: [restaurant, courier]
+                  status:
+                    type: string
+                    example: "active"
+                    enum: [pending, under_review, approved, rejected]
+                  submittedAt:
+                    type: string
+                    format: date-time
+                  documents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        docType:
+                          type: string
+                          example: "cnpj_document"
+                        status:
+                          type: string
+                          example: "active"
+                        uploadedAt:
+                          type: string
+                          example: "2026-07-04T10:05:00Z"
+                          format: date-time
+                  rejectionReason:
+                    type: ['string', 'null']
+                  rejectionNote:
+                    type: ['string', 'null']
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /onboarding/applications/{id}/documents:
+    post:
+      tags: [Onboarding]
+      summary: Upload de documento
+      operationId: uploadOnboardingDocument
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                docType:
+                  type: string
+                  example: "cnpj_document"
+                  enum: [cnpj_document, identity, license, vehicle_doc, contract]
+                file:
+                  type: string
+                  format: binary
+              required: [docType, file]
+      responses:
+        "201":
+          description: Documento enviado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  docType:
+                    type: string
+                    example: "cnpj_document"
+                  checksum:
+                    type: string
+                  uploadedAt:
+                    type: string
+                    example: "2026-07-04T10:05:00Z"
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/moderation/queue:
+    get:
+      tags: [Onboarding Admin]
+      summary: Fila de moderação (admin)
+      operationId: getModerationQueue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [under_review, pending]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [restaurant, courier]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: submitted_at:asc
+      responses:
+        "200":
+          description: Fila de moderação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        applicationId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        type:
+                          type: string
+                        userName:
+                          type: string
+                          example: "ana.souza"
+                        legalName:
+                          type: string
+                          example: "Restaurante do Bairro Ltda"
+                        cnpj:
+                          type: string
+                          example: "12.345.678/0001-90"
+                        status:
+                          type: string
+                          example: "active"
+                        submittedAt:
+                          type: string
+                          example: "2026-07-04T10:00:00Z"
+                          format: date-time
+                        slaRemainingHours:
+                          type: integer
+                          example: 48
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+                  pageSize:
+                    type: integer
+                    example: 20
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/moderation/applications/{id}/approve:
+    post:
+      tags: [Onboarding Admin]
+      summary: Aprovar solicitação (admin)
+      operationId: approveApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  example: "Documentação aprovada após verificação"
+      responses:
+        "200":
+          description: Solicitação aprovada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applicationId:
+                    type: string
+                  status:
+                    type: string
+                    example: approved
+                  reviewedAt:
+                    type: string
+                    example: "2026-07-04T14:00:00Z"
+                    format: date-time
+                  roleAssigned:
+                    type: string
+                    example: "restaurant_owner"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/moderation/applications/{id}/reject:
+    post:
+      tags: [Onboarding Admin]
+      summary: Rejeitar solicitação (admin)
+      operationId: rejectApplication
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "too_far"
+                note:
+                  type: string
+                  example: "Documentação aprovada após verificação"
+              required: [reason]
+      responses:
+        "200":
+          description: Solicitação rejeitada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applicationId:
+                    type: string
+                  status:
+                    type: string
+                    example: rejected
+                  rejectionReason:
+                    type: string
+                  rejectionNote:
+                    type: string
+                  reviewedAt:
+                    type: string
+                    example: "2026-07-04T14:00:00Z"
+                    format: date-time
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 03 - GESTÃO DE CARDÁPIO
+  # ===================================================================
+  /restaurants/{id}/menu:
+    get:
+      tags: [Cardápio]
+      summary: Obter cardápio publicado de um restaurante (público)
+      operationId: getPublicMenu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Cardápio publicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu:
+    get:
+      tags: [Cardápio]
+      summary: Obter cardápio do restaurante autenticado (inclui rascunho)
+      operationId: getMyMenu
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Cardápio do restaurante
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/MenuResponse"
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "active"
+                        enum: [draft, published]
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/categories:
+    post:
+      tags: [Cardápio]
+      summary: Criar categoria
+      operationId: createCategory
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Pizza Margherita"
+                description:
+                  type: string
+                  example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                sortOrder:
+                  type: integer
+                  example: 1
+              required: [name]
+      responses:
+        "201":
+          description: Categoria criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuCategory"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/categories/{categoryId}:
+    patch:
+      tags: [Cardápio]
+      summary: Atualizar categoria
+      operationId: updateCategory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Pizza Margherita"
+                description:
+                  type: string
+                  example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                sortOrder:
+                  type: integer
+                  example: 1
+                isActive:
+                  type: boolean
+                  example: true
+      responses:
+        "200":
+          description: Categoria atualizada
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      tags: [Cardápio]
+      summary: Excluir categoria (apenas se vazia)
+      operationId: deleteCategory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Categoria excluída
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/items:
+    post:
+      tags: [Cardápio]
+      summary: Criar item no cardápio
+      operationId: createMenuItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMenuItemRequest"
+      responses:
+        "201":
+          description: Item criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MenuItem"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/items/{itemId}:
+    patch:
+      tags: [Cardápio]
+      summary: Atualizar item
+      operationId: updateMenuItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Pizza Margherita"
+                description:
+                  type: string
+                  example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                priceCents:
+                  type: integer
+                  example: 2990
+                preparationTimeSeconds:
+                  type: integer
+                  example: 900
+                sortOrder:
+                  type: integer
+                  example: 1
+      responses:
+        "200":
+          description: Item atualizado
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/items/{itemId}/pause:
+    post:
+      tags: [Cardápio]
+      summary: Pausar/retomar item (toggle, efeito imediato)
+      operationId: toggleItemAvailability
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disponibilidade alterada
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/publish:
+    post:
+      tags: [Cardápio]
+      summary: Publicar cardápio (draft → ativo)
+      operationId: publishMenu
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Cardápio publicado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: integer
+                    example: 3
+                  publishedAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+                  changedItemsCount:
+                    type: integer
+                    example: 5
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/schedules:
+    patch:
+      tags: [Cardápio]
+      summary: Atualizar horários de funcionamento
+      operationId: updateSchedules
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                schedules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      dayOfWeek:
+                        type: integer
+                        minimum: 0
+                        maximum: 6
+                      openTime:
+                        type: string
+                        example: "11:00"
+                      closeTime:
+                        type: string
+                        example: "23:00"
+                      isClosed:
+                        type: boolean
+                        example: false
+                    required: [dayOfWeek]
+      responses:
+        "200":
+          description: Horários atualizados
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/menu/items/{itemId}/image:
+    post:
+      tags: [Cardápio]
+      summary: Gerar presigned URL para upload de imagem do item
+      operationId: generateItemImageUploadUrl
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "201":
+          description: URL de upload gerada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl:
+                    type: string
+                    example: "https://storage.fastfood.com.br/presigned/abc123"
+                  imageUrl:
+                    type: string
+                    example: "https://cdn.fastfood.com.br/images/pizza.jpg"
+                  expiresInSeconds:
+                    type: integer
+                    example: 3600
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      tags: [Cardápio]
+      summary: Remover imagem do item
+      operationId: deleteItemImage
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Imagem removida
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 04 - GEOLOCALIZAÇÃO E COBERTURA
+  # ===================================================================
+  /coverage/restaurants:
+    get:
+      tags: [Geolocalização]
+      summary: Listar restaurantes que atendem uma coordenada
+      operationId: getCoverageRestaurants
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Restaurantes disponíveis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    example: -23.562
+                  longitude:
+                    type: number
+                  geohash:
+                    type: string
+                  restaurants:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CoverageRestaurant"
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+                  pageSize:
+                    type: integer
+                    example: 20
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /places/autocomplete:
+    get:
+      tags: [Geolocalização]
+      summary: Autocomplete de endereço
+      operationId: placesAutocomplete
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 3
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Sugestões de endereço
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  predictions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        placeId:
+                          type: string
+                          example: "ChIJN1t_tDeuEmsRUsoyZ83dD3c"
+                        description:
+                          type: string
+                          example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                        mainText:
+                          type: string
+                          example: "Rua Augusta, 1500"
+                        secondaryText:
+                          type: string
+                          example: "Consolação, São Paulo - SP"
+                        latitude:
+                          type: number
+                          example: -23.562
+                        longitude:
+                          type: number
+                          example: -46.654
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /coverage/validate:
+    post:
+      tags: [Geolocalização]
+      summary: Validar cobertura de um restaurante para uma coordenada
+      operationId: validateCoverage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restaurantId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                latitude:
+                  type: number
+                  example: -23.562
+                longitude:
+                  type: number
+                  example: -46.654
+              required: [restaurantId, latitude, longitude]
+      responses:
+        "200":
+          description: Resultado da validação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isCovered:
+                    type: boolean
+                    example: true
+                  distanceKm:
+                    type: number
+                    example: 3.5
+                  deliveryFeeCents:
+                    type: integer
+                    example: 890
+                  estimatedMinutes:
+                    type: integer
+                  zoneId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/zones:
+    get:
+      tags: [Geolocalização]
+      summary: Listar zonas de cobertura (admin)
+      operationId: listZones
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: restaurantId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: zoneType
+          in: query
+          schema:
+            type: string
+            enum: [radius, polygon]
+      responses:
+        "200":
+          description: Lista de zonas
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      tags: [Geolocalização]
+      summary: Criar zona de cobertura (admin)
+      operationId: createZone
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restaurantId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                zoneType:
+                  type: string
+                  example: "radius"
+                  enum: [radius, polygon]
+                latitude:
+                  type: number
+                  example: -23.562
+                longitude:
+                  type: number
+                  example: -46.654
+                radiusKm:
+                  type: number
+                  example: 5
+                baseFeeCents:
+                  type: integer
+                  example: 500
+                additionalFeePerKmCents:
+                  type: integer
+                  example: 200
+                minOrderCents:
+                  type: integer
+                  example: 2000
+              required: [restaurantId, zoneType]
+      responses:
+        "201":
+          description: Zona criada
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 05 - BUSCA E FILTROS
+  # ===================================================================
+  /search/restaurants:
+    get:
+      tags: [Busca]
+      summary: Busca full-text de restaurantes e pratos
+      operationId: searchRestaurants
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: float
+        - name: filters
+          in: query
+          schema:
+            type: string
+            description: Filtros separados por vírgula (freeDelivery, openNow, rating:[4-5], maxFee:1000, cuisine:pizza)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, distance, rating, deliveryTime]
+            default: relevance
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            description: Cursor para paginação (base64)
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Resultados da busca
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchResult"
+                  facets:
+                    type: object
+                    properties:
+                      cuisineTypes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            value:
+                              type: string
+                            count:
+                              type: integer
+                      priceRange:
+                        type: object
+                        properties:
+                          min:
+                            type: integer
+                          max:
+                            type: integer
+                      maxDeliveryFee:
+                        type: integer
+                  metadata:
+                    type: object
+                    properties:
+                      totalResults:
+                        type: integer
+                        example: 156
+                      pageSize:
+                        type: integer
+                        example: 20
+                      nextCursor:
+                        type: string
+                      queryProcessingTimeMs:
+                        type: integer
+                        example: 45
+                      cacheHit:
+                        type: boolean
+                        example: true
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /search/suggestions:
+    get:
+      tags: [Busca]
+      summary: Sugestões de busca para autocomplete
+      operationId: searchSuggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: lat
+          in: query
+          schema:
+            type: number
+        - name: lon
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Sugestões
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                        type:
+                          type: string
+                          enum: [cuisine, restaurant, item]
+                        restaurantId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        resultCount:
+                          type: integer
+                          example: 12
+                  queryProcessingTimeMs:
+                    type: integer
+                    example: 45
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 06 - CARRINHO E PEDIDO
+  # ===================================================================
+  /cart:
+    get:
+      tags: [Carrinho]
+      summary: Obter carrinho atual do usuário
+      operationId: getCart
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Carrinho atual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+        "204":
+          description: Carrinho vazio
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    delete:
+      tags: [Carrinho]
+      summary: Limpar carrinho
+      operationId: clearCart
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Carrinho limpo
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /cart/items:
+    post:
+      tags: [Carrinho]
+      summary: Adicionar item ao carrinho
+      operationId: addCartItem
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCartItemRequest"
+      responses:
+        "200":
+          description: Carrinho atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartResponse"
+        "409":
+          description: Carrinho contém itens de outro restaurante
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /cart/items/{itemId}:
+    delete:
+      tags: [Carrinho]
+      summary: Remover item do carrinho
+      operationId: removeCartItem
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Item removido
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /cart/apply-coupon:
+    post:
+      tags: [Carrinho]
+      summary: Aplicar cupom ao carrinho
+      operationId: applyCoupon
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: "FRETEGRATIS"
+              required: [code]
+      responses:
+        "200":
+          description: Cupom aplicado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: string
+                    example: "FRETEGRATIS"
+                  valid:
+                    type: boolean
+                    example: true
+                  discountCents:
+                    type: integer
+                    example: 500
+                  discountFormatted:
+                    type: string
+                    example: "R$ 5,00"
+                  description:
+                    type: string
+                    example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                  couponId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+        "422":
+          description: Cupom inválido
+  /orders:
+    post:
+      tags: [Pedido]
+      summary: Criar pedido a partir do carrinho
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                promotionCode:
+                  type: string
+      responses:
+        "201":
+          description: Pedido criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "409":
+          description: Item indisponível ou conflito de estoque
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /orders/{orderId}:
+    get:
+      tags: [Pedido]
+      summary: Obter detalhes do pedido
+      operationId: getOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Detalhes do pedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 07 - PAGAMENTOS
+  # ===================================================================
+  /orders/{orderId}/payments:
+    post:
+      tags: [Pagamentos]
+      summary: Iniciar pagamento de um pedido
+      operationId: initiatePayment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                method:
+                  type: string
+                  example: "pix"
+                  enum: [pix, credit_card, meal_voucher]
+                token:
+                  type: string
+                  description: Token do cartão (obrigatório se method=credit_card)
+                saveToken:
+                  type: boolean
+                  example: true
+              required: [method]
+      responses:
+        "200":
+          description: Pagamento processado
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PixPaymentResponse"
+                  - $ref: "#/components/schemas/CardPaymentResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /orders/{orderId}/payments/status:
+    get:
+      tags: [Pagamentos]
+      summary: Consultar status do pagamento
+      operationId: getPaymentStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Status do pagamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  status:
+                    type: string
+                    example: "active"
+                    enum: [pending, paid, failed, expired, refunded, partially_refunded]
+                  method:
+                    type: string
+                    example: "pix"
+                  amountCents:
+                    type: integer
+                    example: 2990
+                  paidAt:
+                    type: ["string", "null"]
+                    example: "2026-07-04T14:31:00Z"
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /webhooks/payments/{provider}:
+    post:
+      tags: [Pagamentos]
+      summary: Webhook de gateway de pagamento
+      operationId: paymentWebhook
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [stripe, adyen]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Webhook processado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: processed
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/orders/{orderId}/refund:
+    post:
+      tags: [Pagamentos]
+      summary: Solicitar reembolso (admin)
+      operationId: requestRefund
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amountCents:
+                  type: integer
+                  example: 2990
+                reason:
+                  type: string
+                  example: "too_far"
+              required: [amountCents]
+      responses:
+        "200":
+          description: Reembolso processado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refundId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  paymentId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  amountCents:
+                    type: integer
+                  status:
+                    type: string
+                    example: refunded
+                  gatewayRefundId:
+                    type: string
+                    example: "re_3QpLmN8YzX"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /payments/methods:
+    get:
+      tags: [Pagamentos]
+      summary: Listar métodos de pagamento salvos
+      operationId: listPaymentMethods
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Métodos de pagamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cards:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tokenId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        brand:
+                          type: string
+                          example: "Visa"
+                        last4:
+                          type: string
+                          example: "4532"
+                        expMonth:
+                          type: integer
+                        expYear:
+                          type: integer
+                        isDefault:
+                          type: boolean
+                          example: true
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 08 - ESTADOS DO PEDIDO
+  # ===================================================================
+  /restaurants/me/orders:
+    get:
+      tags: [Estados do Pedido]
+      summary: Listar pedidos do restaurante autenticado
+      operationId: listRestaurantOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, completed, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Lista de pedidos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RestaurantOrder"
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+                  pageSize:
+                    type: integer
+                    example: 20
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /orders/{orderId}/transitions:
+    post:
+      tags: [Estados do Pedido]
+      summary: Executar transição de estado
+      operationId: transitionOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                to:
+                  type: string
+                  example: "paid"
+                  enum: [preparing, ready_for_pickup]
+                reason:
+                  type: string
+                  example: "too_far"
+              required: [to]
+      responses:
+        "200":
+          description: Transição realizada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  fromStatus:
+                    type: string
+                  toStatus:
+                    type: string
+                  elapsedSeconds:
+                    type: integer
+                    example: 120
+                  timestamp:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+        "409":
+          description: Transição inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /orders/{orderId}/cancel:
+    post:
+      tags: [Estados do Pedido]
+      summary: Cancelar pedido
+      operationId: cancelOrder
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "too_far"
+                cancelledBy:
+                  type: string
+                  example: "customer"
+                  enum: [customer, restaurant_owner, admin]
+              required: [reason, cancelledBy]
+      responses:
+        "200":
+          description: Pedido cancelado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: cancelled
+                  cancelledAt:
+                    type: string
+                    example: "2026-07-04T15:10:00Z"
+                    format: date-time
+                  refundStatus:
+                    type: string
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/orders/{orderId}/timeline:
+    get:
+      tags: [Estados do Pedido]
+      summary: Obter timeline do pedido
+      operationId: getOrderTimeline
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Timeline do pedido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  timeline:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from:
+                          type: ['string', 'null']
+                          example: "pending_payment"
+                        to:
+                          type: string
+                          example: "paid"
+                        by:
+                          type: string
+                          example: "customer"
+                        at:
+                          type: string
+                          format: date-time
+                        elapsedSeconds:
+                          type: integer
+                          example: 120
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 09 - MATCHING E ACEITE
+  # ===================================================================
+  /couriers/me/status:
+    post:
+      tags: [Matching]
+      summary: Ativar/desativar disponibilidade do entregador
+      operationId: setCourierStatus
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                online:
+                  type: boolean
+                  example: true
+                reason:
+                  type: string
+                  example: "too_far"
+                  enum: [manual_toggle, app_background, battery_low]
+              required: [online]
+      responses:
+        "200":
+          description: Status atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  courierId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  status:
+                    type: string
+                    example: "active"
+                  since:
+                    type: string
+                    example: "2026-07-04T10:00:00Z"
+                    format: date-time
+                  pendingOffers:
+                    type: integer
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /couriers/me/location:
+    post:
+      tags: [Matching]
+      summary: Atualizar localização do entregador
+      operationId: updateCourierLocation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat:
+                  type: number
+                  example: -23.562
+                lon:
+                  type: number
+                  example: -46.654
+                accuracy:
+                  type: integer
+                  example: 15
+                batteryLevel:
+                  type: integer
+                  example: 85
+              required: [lat, lon]
+      responses:
+        "204":
+          description: Localização atualizada
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /couriers/me/offers:
+    get:
+      tags: [Matching]
+      summary: Listar ofertas recebidas pelo entregador
+      operationId: listCourierOffers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, accepted, rejected, expired]
+      responses:
+        "200":
+          description: Lista de ofertas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        offerId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        orderId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        restaurantName:
+                          type: string
+                        restaurantAddress:
+                          type: string
+                        distanceKm:
+                          type: number
+                        estimatedFareCents:
+                          type: integer
+                        estimatedRoute:
+                          type: object
+                          properties:
+                            pickupLat:
+                              type: number
+                            pickupLon:
+                              type: number
+                            dropoffLat:
+                              type: number
+                            dropoffLon:
+                              type: number
+                        expiresAt:
+                          type: string
+                          example: "2026-07-04T15:00:00Z"
+                          format: date-time
+                        createdAt:
+                          type: string
+                          example: "2026-07-04T14:30:00Z"
+                          format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /delivery-offers/{offerId}/accept:
+    post:
+      tags: [Matching]
+      summary: Aceitar oferta de entrega (atômico)
+      operationId: acceptOffer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Oferta aceita
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offerId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  orderId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  assignmentId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: accepted
+                  restaurant:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Pizza Margherita"
+                      address:
+                        type: string
+                      lat:
+                        type: number
+                      lon:
+                        type: number
+                  customer:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Pizza Margherita"
+                      address:
+                        type: string
+                      lat:
+                        type: number
+                      lon:
+                        type: number
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                          example: "Pizza Margherita"
+                        quantity:
+                          type: integer
+                  acceptedAt:
+                    type: string
+                    example: "2026-07-04T14:45:00Z"
+                    format: date-time
+        "409":
+          description: Oferta já aceita por outro entregador
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "410":
+          description: Oferta expirada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /delivery-offers/{offerId}/reject:
+    post:
+      tags: [Matching]
+      summary: Rejeitar oferta de entrega
+      operationId: rejectOffer
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: offerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "too_far"
+                  enum: [too_far, busy, low_fare, other]
+      responses:
+        "200":
+          description: Oferta rejeitada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  offerId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: rejected
+                  nextOfferEta:
+                    type: string
+                    example: "Em até 30 segundos"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/escalation/queue:
+    get:
+      tags: [Matching Admin]
+      summary: Listar fila de escalonamento (admin)
+      operationId: getEscalationQueue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, resolved, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Fila de escalonamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queue:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        orderId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        restaurantName:
+                          type: string
+                        attempts:
+                          type: integer
+                          example: 1
+                        escalatedAt:
+                          type: string
+                          example: "2026-07-04T14:40:00Z"
+                          format: date-time
+                        lastAttemptAt:
+                          type: string
+                          example: "2026-07-04T14:45:00Z"
+                          format: date-time
+                        coverageRadiusKm:
+                          type: number
+                          example: 5
+                        availableCouriersNearby:
+                          type: integer
+                          example: 3
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 10 - ROTEIRIZAÇÃO E LOCALIZAÇÃO
+  # ===================================================================
+  /deliveries/{deliveryId}/location:
+    post:
+      tags: [Roteirização]
+      summary: Enviar ping(s) de localização do entregador
+      operationId: sendLocationPing
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/SingleLocationPing"
+                - $ref: "#/components/schemas/BatchLocationPing"
+      responses:
+        "204":
+          description: Localização registrada
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /deliveries/{deliveryId}/milestones:
+    post:
+      tags: [Roteirização]
+      summary: Registrar milestone da corrida
+      operationId: registerMilestone
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/SingleMilestone"
+                - $ref: "#/components/schemas/BatchMilestone"
+      responses:
+        "200":
+          description: Milestone registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveryId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  milestone:
+                    type: string
+                    example: "picked_up"
+                  previousMilestone:
+                    type: string
+                    example: "arrived_at_restaurant"
+                  changedAt:
+                    type: string
+                    example: "2026-07-04T14:35:00Z"
+                    format: date-time
+        "409":
+          description: Transição inválida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /deliveries/{deliveryId}/route:
+    get:
+      tags: [Roteirização]
+      summary: Obter rota cacheada da entrega
+      operationId: getDeliveryRoute
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Rota da entrega
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveryId:
+                    type: string
+                    format: uuid
+                  pickup:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Pizza Margherita"
+                      address:
+                        type: string
+                      lat:
+                        type: number
+                      lon:
+                        type: number
+                  dropoff:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Pizza Margherita"
+                      address:
+                        type: string
+                      lat:
+                        type: number
+                        example: -23.562
+                      lon:
+                        type: number
+                        example: -46.654
+                  polylineEncoded:
+                    type: string
+                    example: "_{~qF`~psU?}"
+                  distanceKm:
+                    type: number
+                  estimatedDurationMinutes:
+                    type: integer
+                  deepLink:
+                    type: object
+                    properties:
+                      googleMaps:
+                        type: string
+                        example: "https://maps.google.com/?q=-23.562,-46.654"
+                      waze:
+                        type: string
+                        example: "https://waze.com/ul?ll=-23.562,-46.654"
+                  cachedAt:
+                    type: string
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /clients/orders/{orderId}/tracking:
+    get:
+      tags: [Roteirização]
+      summary: Obter posição atual do entregador (cliente)
+      operationId: getClientTracking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Tracking do pedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientTrackingResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/deliveries/{deliveryId}/track:
+    get:
+      tags: [Roteirização Admin]
+      summary: Tracking completo de uma entrega (admin)
+      operationId: getAdminDeliveryTrack
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Tracking completo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveryId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  courierId:
+                    type: string
+                    format: uuid
+                  milestones:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        milestone:
+                          type: string
+                          example: "picked_up"
+                        at:
+                          type: string
+                          format: date-time
+                        source:
+                          type: string
+                  route:
+                    type: object
+                    properties:
+                      pickup:
+                        type: object
+                        properties:
+                          lat:
+                            type: number
+                          lon:
+                            type: number
+                      dropoff:
+                        type: object
+                        properties:
+                          lat:
+                            type: number
+                            example: -23.562
+                          lon:
+                            type: number
+                            example: -46.654
+                      distanceKm:
+                        type: number
+                  pingCount:
+                    type: integer
+                  offlinePeriods:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        from:
+                          type: string
+                          example: "pending_payment"
+                          format: date-time
+                        to:
+                          type: string
+                          example: "paid"
+                          format: date-time
+                        durationSeconds:
+                          type: integer
+                          example: 300
+                  totalActiveSeconds:
+                    type: integer
+                    example: 720
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 11 - RASTREAMENTO TEMPO REAL
+  # ===================================================================
+  /orders/{orderId}/tracking:
+    get:
+      tags: [Rastreamento]
+      summary: Snapshot REST da posição do entregador
+      operationId: getOrderTrackingSnapshot
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Snapshot de tracking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientTrackingResponse"
+        "403":
+          description: Usuário não é o dono do pedido
+        "404":
+          description: Pedido sem tracking ativo
+        "410":
+          description: Pedido já foi entregue
+  /orders/{orderId}/tracking/history:
+    get:
+      tags: [Rastreamento]
+      summary: Histórico de posições do entregador
+      operationId: getTrackingHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Histórico de posições
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  positions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                          example: -23.562
+                        lon:
+                          type: number
+                          example: -46.654
+                        recordedAt:
+                          type: string
+                          format: date-time
+                  milestones:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        milestone:
+                          type: string
+                          example: "picked_up"
+                        at:
+                          type: string
+                          format: date-time
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 12 - CONFIRMAÇÃO DE ENTREGA
+  # ===================================================================
+  /clients/orders/{orderId}/delivery-code:
+    get:
+      tags: [Confirmação]
+      summary: Obter código de confirmação (cliente)
+      operationId: getDeliveryCode
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Código de confirmação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  code:
+                    type: string
+                    example: "482913"
+                  expiresAt:
+                    type: string
+                    example: "2026-07-04T15:00:00Z"
+                    format: date-time
+                  generatedAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+        "403":
+          description: Cliente não é o dono do pedido
+        "410":
+          description: Pedido já entregue ou código expirado
+  /deliveries/{deliveryId}/confirm:
+    post:
+      tags: [Confirmação]
+      summary: Submeter código de confirmação (entregador)
+      operationId: confirmDelivery
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  example: "482913"
+                lat:
+                  type: number
+                  example: -23.562
+                lon:
+                  type: number
+                  example: -46.654
+              required: [code]
+      responses:
+        "200":
+          description: Entrega confirmada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveryId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  orderId:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    example: delivered
+                  confirmedAt:
+                    type: string
+                    example: "2026-07-04T15:00:00Z"
+                    format: date-time
+        "401":
+          description: Código inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Bloqueado por excesso de tentativas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "410":
+          description: Código expirado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /deliveries/confirm/batch:
+    post:
+      tags: [Confirmação]
+      summary: Batch de confirmações offline (entregador)
+      operationId: confirmDeliveryBatch
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmations:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      deliveryId:
+                        type: string
+                        example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                        format: uuid
+                      codeHash:
+                        type: string
+                      codePrefix:
+                        type: string
+                      lat:
+                        type: number
+                        example: -23.562
+                      lon:
+                        type: number
+                        example: -46.654
+                      confirmedAt:
+                        type: string
+                        example: "2026-07-04T15:00:00Z"
+                        format: date-time
+                    required: [deliveryId, codeHash, codePrefix]
+              required: [confirmations]
+      responses:
+        "200":
+          description: Resultados do batch
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        deliveryId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        status:
+                          type: string
+                          example: "active"
+                          enum: [confirmed, invalid_code]
+                        confirmedAt:
+                          type: string
+                          example: "2026-07-04T15:00:00Z"
+                          format: date-time
+                        reason:
+                          type: string
+                          example: "too_far"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /deliveries/{deliveryId}/code/reissue:
+    post:
+      tags: [Confirmação]
+      summary: Solicitar reemissão de código expirado
+      operationId: reissueDeliveryCode
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deliveryId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Novo código gerado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deliveryId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  newCodeGenerated:
+                    type: boolean
+                    example: true
+                  expiresAt:
+                    type: string
+                    example: "2026-07-04T15:00:00Z"
+                    format: date-time
+                  reissueCount:
+                    type: integer
+                  maxReissues:
+                    type: integer
+        "429":
+          description: Limite de reemissões excedido
+  /admin/disputes:
+    get:
+      tags: [Confirmação Admin]
+      summary: Listar disputas (admin)
+      operationId: listDisputes
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, under_review, resolved, dismissed]
+      responses:
+        "200":
+          description: Lista de disputas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disputes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        disputeId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        orderId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        deliveryId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        openedBy:
+                          type: string
+                        reason:
+                          type: string
+                          example: "too_far"
+                        status:
+                          type: string
+                          example: "active"
+                        createdAt:
+                          type: string
+                          example: "2026-07-04T14:30:00Z"
+                          format: date-time
+                        evidence:
+                          type: object
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/disputes/{disputeId}/resolve:
+    post:
+      tags: [Confirmação Admin]
+      summary: Resolver disputa (admin)
+      operationId: resolveDispute
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resolution:
+                  type: string
+                  example: "valid_delivery"
+                  enum: [valid_delivery, refund_customer]
+                notes:
+                  type: string
+              required: [resolution]
+      responses:
+        "200":
+          description: Disputa resolvida
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disputeId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  status:
+                    type: string
+                    example: "active"
+                  resolvedBy:
+                    type: string
+                    format: uuid
+                  resolvedAt:
+                    type: string
+                    example: "2026-07-04T16:00:00Z"
+                    format: date-time
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 13 - AVALIAÇÕES
+  # ===================================================================
+  /orders/{orderId}/ratings:
+    post:
+      tags: [Avaliações]
+      summary: Submeter avaliação do pedido
+      operationId: submitRating
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRatingRequest"
+      responses:
+        "201":
+          description: Avaliação registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  ratings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ratingId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        targetType:
+                          type: string
+                          example: "restaurant"
+                        score:
+                          type: integer
+                          example: 5
+                        commentStatus:
+                          type: string
+                          enum: [approved, pending_review, blocked]
+                  createdAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+        "409":
+          description: Avaliação já existe para este pedido
+        "422":
+          description: Comentário bloqueado pela moderação
+    get:
+      tags: [Avaliações]
+      summary: Obter avaliações do pedido
+      operationId: getOrderRatings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Avaliações do pedido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                    format: uuid
+                  ratings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ratingId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        targetType:
+                          type: string
+                          example: "restaurant"
+                        targetName:
+                          type: string
+                        score:
+                          type: integer
+                          example: 5
+                        comment:
+                          type: string
+                        commentStatus:
+                          type: string
+                        createdAt:
+                          type: string
+                          example: "2026-07-04T14:30:00Z"
+                          format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /orders/{orderId}/ratings/{ratingId}:
+    put:
+      tags: [Avaliações]
+      summary: Editar comentário da avaliação
+      operationId: editRatingComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: ratingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                  maxLength: 500
+              required: [comment]
+      responses:
+        "200":
+          description: Comentário atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ratingId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  score:
+                    type: integer
+                    example: 5
+                  comment:
+                    type: string
+                  isEdited:
+                    type: boolean
+                    example: false
+                  editedAt:
+                    type: string
+                    example: "2026-07-04T15:30:00Z"
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /ratings/{targetType}/{targetId}:
+    get:
+      tags: [Avaliações]
+      summary: Obter agregado de avaliações (público)
+      operationId: getRatingAggregate
+      parameters:
+        - name: targetType
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [restaurant, courier]
+        - name: targetId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Agregado de avaliações
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  targetType:
+                    type: string
+                    example: "restaurant"
+                  targetId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  avgScore:
+                    type: number
+                  totalRatings:
+                    type: integer
+                  distribution:
+                    type: object
+                    properties:
+                      "1":
+                        type: integer
+                      "2":
+                        type: integer
+                      "3":
+                        type: integer
+                      "4":
+                        type: integer
+                      "5":
+                        type: integer
+                  lastRatingAt:
+                    type: string
+                    format: date-time
+                  recentComments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        comment:
+                          type: string
+                        score:
+                          type: integer
+                          example: 5
+                        createdAt:
+                          type: string
+                          example: "2026-07-04T14:30:00Z"
+                          format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/moderation/ratings/queue:
+    get:
+      tags: [Avaliações Admin]
+      summary: Listar comentários pendentes de moderação (admin)
+      operationId: listRatingModerationQueue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending_review, approved, blocked]
+      responses:
+        "200":
+          description: Fila de moderação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queue:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ratingId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        orderId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        comment:
+                          type: string
+                        score:
+                          type: integer
+                          example: 5
+                        targetType:
+                          type: string
+                          example: "restaurant"
+                        targetName:
+                          type: string
+                        moderationResult:
+                          type: object
+                        createdAt:
+                          type: string
+                          example: "2026-07-04T14:30:00Z"
+                          format: date-time
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/moderation/ratings/queue/{ratingId}/review:
+    post:
+      tags: [Avaliações Admin]
+      summary: Revisar comentário sinalizado (admin)
+      operationId: reviewRating
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ratingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  example: "approve"
+                  enum: [approve, block, edit]
+                notes:
+                  type: string
+              required: [action]
+      responses:
+        "200":
+          description: Comentário revisado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ratingId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  commentStatus:
+                    type: string
+                  reviewedBy:
+                    type: string
+                    format: uuid
+                  reviewedAt:
+                    type: string
+                    example: "2026-07-04T14:00:00Z"
+                    format: date-time
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 14 - PAINEL FINANCEIRO
+  # ===================================================================
+  /restaurants/me/finance/summary:
+    get:
+      tags: [Financeiro]
+      summary: Resumo financeiro do restaurante
+      operationId: getFinanceSummary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [today, yesterday, week, month, custom]
+            default: week
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Resumo financeiro
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceSummaryResponse"
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/finance/orders:
+    get:
+      tags: [Financeiro]
+      summary: Extrato detalhado por pedido
+      operationId: getFinanceOrders
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Extrato por pedido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orders:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FinanceOrderEntry"
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  summary:
+                    type: object
+                    properties:
+                      totalGrossCents:
+                        type: integer
+                        example: 5000
+                      totalFeesCents:
+                        type: integer
+                        example: 1250
+                      totalNetCents:
+                        type: integer
+                        example: 3750
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/finance/payouts:
+    get:
+      tags: [Financeiro]
+      summary: Histórico de repasses
+      operationId: getPayoutHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [completed, pending, failed]
+      responses:
+        "200":
+          description: Histórico de repasses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payouts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PayoutEntry"
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+                  pageSize:
+                    type: integer
+                    example: 20
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/finance/payouts/next:
+    get:
+      tags: [Financeiro]
+      summary: Próximo repasse previsto
+      operationId: getNextPayout
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Próximo repasse
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nextPayoutDate:
+                    type: string
+                    example: "2026-07-11"
+                    format: date
+                  estimatedNetCents:
+                    type: integer
+                  estimatedNetFormatted:
+                    type: string
+                  period:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        example: "pending_payment"
+                        format: date
+                      to:
+                        type: string
+                        example: "paid"
+                        format: date
+                  pendingOrders:
+                    type: integer
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /restaurants/me/finance/reports/export:
+    get:
+      tags: [Financeiro]
+      summary: Exportar relatório financeiro em CSV
+      operationId: exportFinanceReport
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          schema:
+            type: string
+            default: csv
+      responses:
+        "200":
+          description: Arquivo CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/finance/restaurants/{restaurantId}/adjustments:
+    post:
+      tags: [Financeiro Admin]
+      summary: Registrar ajuste manual no ledger (admin)
+      operationId: registerAdjustment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orderId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                amountCents:
+                  type: integer
+                  example: 2990
+                description:
+                  type: string
+                  example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+                entryType:
+                  type: string
+                  example: "adjustment"
+                  enum: [adjustment]
+              required: [amountCents, description]
+      responses:
+        "201":
+          description: Ajuste registrado
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/finance/reconciliation:
+    get:
+      tags: [Financeiro Admin]
+      summary: Status da reconciliação financeira (admin)
+      operationId: getReconciliationStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Status da reconciliação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  ledgerTotalCents:
+                    type: integer
+                  gatewayTotalCents:
+                    type: integer
+                  differenceCents:
+                    type: integer
+                  status:
+                    type: string
+                    example: "active"
+                    enum: [matched, unmatched, investigating]
+                  details:
+                    type: ['object', 'null']
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  # ===================================================================
+  # 15 - CUPONS E CAMPANHAS
+  # ===================================================================
+  /admin/coupons:
+    get:
+      tags: [Cupons Admin]
+      summary: Listar cupons (admin)
+      operationId: listCoupons
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, expired, draft]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        "200":
+          description: Lista de cupons
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  coupons:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        couponId:
+                          type: string
+                          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                          format: uuid
+                        code:
+                          type: string
+                        type:
+                          type: string
+                        valuePercent:
+                          type: number
+                          example: 15
+                        redemptions:
+                          type: integer
+                          example: 145
+                        maxRedemptions:
+                          type: integer
+                          example: 1000
+                        status:
+                          type: string
+                          example: "active"
+                        startsAt:
+                          type: string
+                          example: "2026-07-04T08:00:00Z"
+                          format: date-time
+                        endsAt:
+                          type: string
+                          example: "2026-07-18T23:59:00Z"
+                          format: date-time
+                  total:
+                    type: integer
+                    example: 10
+                  page:
+                    type: integer
+                    example: 1
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      tags: [Cupons Admin]
+      summary: Criar cupom (admin)
+      operationId: createCoupon
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCouponRequest"
+      responses:
+        "201":
+          description: Cupom criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  couponId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  code:
+                    type: string
+                  type:
+                    type: string
+                  status:
+                    type: string
+                    example: active
+                  createdAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/campaigns:
+    post:
+      tags: [Campanhas Admin]
+      summary: Criar campanha (admin)
+      operationId: createCampaign
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "201":
+          description: Campanha criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaignId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  name:
+                    type: string
+                  status:
+                    type: string
+                    example: draft
+                  createdAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/campaigns/{campaignId}/stats:
+    get:
+      tags: [Campanhas Admin]
+      summary: Relatório de performance da campanha (admin)
+      operationId: getCampaignStats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: campaignId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Relatório da campanha
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaignId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  name:
+                    type: string
+                  status:
+                    type: string
+                  period:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        example: "pending_payment"
+                        format: date
+                      to:
+                        type: string
+                        example: "paid"
+                        format: date
+                  budgetCents:
+                    type: integer
+                    example: 100000
+                  budgetSpentCents:
+                    type: integer
+                  budgetUsagePercent:
+                    type: number
+                  metrics:
+                    type: object
+                    properties:
+                      totalRedemptions:
+                        type: integer
+                      totalDiscountCents:
+                        type: integer
+                      totalGrossOrderCents:
+                        type: integer
+                      avgDiscountPerOrderCents:
+                        type: integer
+                      avgOrderValueCents:
+                        type: integer
+                      newUsersAcquired:
+                        type: integer
+                      subsidyPlatformCents:
+                        type: integer
+                      subsidyRestaurantCents:
+                        type: integer
+                      roiPercent:
+                        type: number
+                  dailyBreakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        redemptions:
+                          type: integer
+                          example: 145
+                        discountCents:
+                          type: integer
+                          example: 500
+                        grossCents:
+                          type: integer
+                        newUsers:
+                          type: integer
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /coupons/{couponId}/redeem:
+    post:
+      tags: [Cupons]
+      summary: Resgatar cupom (chamada interna do Order Service)
+      operationId: redeemCoupon
+      parameters:
+        - name: couponId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orderId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                userId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                originalTotalCents:
+                  type: integer
+                discountCents:
+                  type: integer
+                  example: 500
+              required: [orderId, userId, originalTotalCents, discountCents]
+      responses:
+        "201":
+          description: Cupom resgatado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redemptionId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  couponId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  discountCents:
+                    type: integer
+                    example: 500
+                  remainingRedemptions:
+                    type: integer
+        "409":
+          description: Cupom esgotado
+  /delivery/fee:
+    get:
+      tags: [Cupons]
+      summary: Calcular taxa de entrega para uma localização
+      operationId: getDeliveryFee
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: restaurantId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Taxa de entrega calculada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  zoneId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  feeCents:
+                    type: integer
+                  feeFormatted:
+                    type: string
+                  freeDeliveryAboveCents:
+                    type: integer
+                  estimatedMinutes:
+                    type: integer
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/delivery/fee-rules:
+    post:
+      tags: [Cupons Admin]
+      summary: Criar regra de frete para região (admin)
+      operationId: createDeliveryFeeRule
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                zoneId:
+                  type: string
+                  example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                  format: uuid
+                feeCents:
+                  type: integer
+                minOrderCents:
+                  type: integer
+                  example: 2000
+                freeDeliveryAboveCents:
+                  type: integer
+                validFrom:
+                  type: string
+                  format: date-time
+                validTo:
+                  type: string
+                  format: date-time
+                priority:
+                  type: integer
+              required: [zoneId, feeCents, validFrom, validTo]
+      responses:
+        "201":
+          description: Regra de frete criada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feeRuleId:
+                    type: string
+                    example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                    format: uuid
+                  feeCents:
+                    type: integer
+                  createdAt:
+                    type: string
+                    example: "2026-07-04T14:30:00Z"
+                    format: date-time
+
+        "4XX":
+          description: Erro na requisição
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ===== Error Schema =====
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "FRETEGRATIS"
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - RATE_LIMITED
+                - IDEMPOTENCY_REUSE
+                - GONE
+                - DEPENDENCY_FAILURE
+                - TIMEOUT
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  reason:
+                    type: string
+                    example: "too_far"
+            correlationId:
+              type: string
+              example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+              format: uuid
+            timestamp:
+              type: string
+              example: "2026-07-04T14:30:00Z"
+              format: date-time
+
+    # ===== 00 - Plataforma Transversal =====
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        service:
+          type: string
+          example: api-gateway
+        version:
+          type: string
+          example: 1.0.0
+        checks:
+          type: object
+          properties:
+            postgres:
+              type: string
+              example: healthy
+            redis:
+              type: string
+              example: healthy
+            event_bus:
+              type: string
+              example: degraded
+            latency_p95_ms:
+              type: integer
+              example: 15
+        uptime_seconds:
+          type: integer
+          example: 3600
+        timestamp:
+          type: string
+          example: "2026-07-04T14:30:00Z"
+          format: date-time
+
+    # ===== 01 - Identidade =====
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          example: "ana.souza@example.com"
+          format: email
+        password:
+          type: string
+          example: "MinhaSenha123!"
+          minLength: 8
+        fullName:
+          type: string
+          example: "Ana Souza"
+        birthDate:
+          type: string
+          example: "1990-05-15"
+          format: date
+        marketingOptIn:
+          type: boolean
+          default: false
+
+    RegisterResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        accessToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        refreshToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        expiresIn:
+          type: integer
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          example: "ana.souza@example.com"
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        accessToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        refreshToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        expiresIn:
+          type: integer
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    RefreshResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        refreshToken:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+        expiresIn:
+          type: integer
+
+    UserProfile:
+      type: object
+      properties:
+        userId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        email:
+          type: string
+          example: "ana.souza@example.com"
+        emailVerified:
+          type: boolean
+        phone:
+          type: ['string', 'null']
+          example: "+55 11 99999-8888"
+        fullName:
+          type: string
+          example: "Ana Souza"
+        birthDate:
+          type: ["string", "null"]
+          example: "1990-05-15"
+          format: date
+        marketingOptIn:
+          type: boolean
+          example: true
+        preferredLanguage:
+          type: string
+
+    Address:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        label:
+          type: string
+          example: "casa"
+          enum: [casa, trabalho, outro]
+        zipCode:
+          type: string
+          example: "01304-001"
+        street:
+          type: string
+          example: "Rua Augusta"
+        number:
+          type: string
+          example: "1500"
+        complement:
+          type: ['string', 'null']
+          example: "Apto 42"
+        neighborhood:
+          type: string
+          example: "Consolação"
+        city:
+          type: string
+          example: "São Paulo"
+        state:
+          type: string
+          example: "SP"
+        country:
+          type: string
+          example: "Brasil"
+        latitude:
+          type: ['number', 'null']
+          example: -23.562
+        longitude:
+          type: ['number', 'null']
+          example: -46.654
+        isDefault:
+          type: boolean
+
+    CreateAddressRequest:
+      type: object
+      required: [zipCode, street, number, neighborhood, city, state]
+      properties:
+        label:
+          type: string
+          example: "casa"
+          enum: [casa, trabalho, outro]
+          default: outro
+        zipCode:
+          type: string
+          example: "01304-001"
+        street:
+          type: string
+          example: "Rua Augusta"
+        number:
+          type: string
+          example: "1500"
+        complement:
+          type: string
+          example: "Apto 42"
+        neighborhood:
+          type: string
+          example: "Consolação"
+        city:
+          type: string
+          example: "São Paulo"
+        state:
+          type: string
+          example: "SP"
+        country:
+          type: string
+          example: "Brasil"
+          default: BR
+        isDefault:
+          type: boolean
+          example: true
+          default: false
+
+    # ===== 02 - Onboarding =====
+    OnboardingRestaurantRequest:
+      type: object
+      required: [legalName, tradingName, cnpj, cpfResponsavel, phone, address]
+      properties:
+        legalName:
+          type: string
+          example: "Restaurante do Bairro Ltda"
+        tradingName:
+          type: string
+        cnpj:
+          type: string
+          example: "12.345.678/0001-90"
+        cpfResponsavel:
+          type: string
+        phone:
+          type: string
+        address:
+          type: object
+          properties:
+            zipCode:
+              type: string
+              example: "01304-001"
+            street:
+              type: string
+              example: "Rua Augusta"
+            number:
+              type: string
+              example: "1500"
+            complement:
+              type: string
+              example: "Apto 42"
+            neighborhood:
+              type: string
+              example: "Consolação"
+            city:
+              type: string
+              example: "São Paulo"
+            state:
+              type: string
+              example: "SP"
+          required: [zipCode, street, number, neighborhood, city, state]
+
+    OnboardingCourierRequest:
+      type: object
+      required: [vehicleType, licenseNumber, licenseExpiry, licenseCategory]
+      properties:
+        vehicleType:
+          type: string
+          enum: [motorcycle, bicycle, car, scooter]
+        licenseNumber:
+          type: string
+        licenseExpiry:
+          type: string
+          format: date
+        licenseCategory:
+          type: string
+        vehiclePlate:
+          type: string
+        vehicleYear:
+          type: integer
+        vehicleColor:
+          type: string
+
+    OnboardingResponse:
+      type: object
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: pending
+        submittedAt:
+          type: string
+          example: "2026-07-04T10:00:00Z"
+          format: date-time
+        documentUploadUrl:
+          type: string
+        requiredDocuments:
+          type: array
+          items:
+            type: string
+
+    # ===== 03 - Cardápio =====
+    MenuCategory:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        description:
+          type: ['string', 'null']
+        sortOrder:
+          type: integer
+        isActive:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuItem"
+
+    MenuItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        description:
+          type: ['string', 'null']
+          example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+        priceCents:
+          type: integer
+          example: 2990
+        imageUrl:
+          type: ['string', 'null']
+          example: "https://cdn.fastfood.com.br/images/pizza.jpg"
+        preparationTimeSeconds:
+          type: integer
+          example: 900
+        isAvailable:
+          type: boolean
+        sortOrder:
+          type: integer
+        modifiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuModifier"
+
+    MenuModifier:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        minSelections:
+          type: integer
+        maxSelections:
+          type: integer
+        isRequired:
+          type: boolean
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModifierOption"
+
+    ModifierOption:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        priceDeltaCents:
+          type: integer
+        isDefault:
+          type: boolean
+
+    MenuResponse:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        publishedVersion:
+          type: integer
+        isOpen:
+          type: boolean
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/MenuCategory"
+
+    CreateMenuItemRequest:
+      type: object
+      required: [categoryId, name, priceCents]
+      properties:
+        categoryId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        description:
+          type: string
+          example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+        priceCents:
+          type: integer
+          example: 2990
+        preparationTimeSeconds:
+          type: integer
+        sortOrder:
+          type: integer
+        modifiers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Pizza Margherita"
+              minSelections:
+                type: integer
+              maxSelections:
+                type: integer
+              isRequired:
+                type: boolean
+              options:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      example: "Pizza Margherita"
+                    priceDeltaCents:
+                      type: integer
+                    isDefault:
+                      type: boolean
+
+    # ===== 04 - Geolocalização =====
+    CoverageRestaurant:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        distanceKm:
+          type: number
+          example: 3.5
+        deliveryFeeCents:
+          type: integer
+          example: 890
+        estimatedMinutes:
+          type: integer
+        isOpen:
+          type: boolean
+        averageRating:
+          type: number
+        category:
+          type: string
+
+    # ===== 05 - Busca =====
+    SearchResult:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        description:
+          type: string
+          example: "Pizza clássica com molho de tomate, mussarela e manjericão"
+        cuisineType:
+          type: string
+        avgRating:
+          type: number
+        reviewCount:
+          type: integer
+        deliveryFeeCents:
+          type: integer
+          example: 890
+        minOrderCents:
+          type: integer
+          example: 2000
+        estimatedMinutes:
+          type: integer
+        distanceKm:
+          type: number
+        isOpen:
+          type: boolean
+        matchedItems:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Pizza Margherita"
+              priceCents:
+                type: integer
+
+    # ===== 06 - Carrinho =====
+    CartResponse:
+      type: object
+      properties:
+        restaurantId:
+          type: string
+          format: uuid
+        restaurantName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotalCents:
+          type: integer
+        deliveryFeeCents:
+          type: integer
+          example: 890
+        discountCents:
+          type: integer
+          example: 500
+        totalCents:
+          type: integer
+        promotionCode:
+          type: ['string', 'null']
+        expiresAt:
+          type: string
+          format: date-time
+
+    CartItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        name:
+          type: string
+          example: "Pizza Margherita"
+        quantity:
+          type: integer
+        unitPriceCents:
+          type: integer
+        modifiers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Pizza Margherita"
+              priceDeltaCents:
+                type: integer
+        totalPriceCents:
+          type: integer
+        notes:
+          type: string
+
+    AddCartItemRequest:
+      type: object
+      required: [itemId, categoryId, quantity]
+      properties:
+        itemId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        categoryId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        modifiers:
+          type: array
+          items:
+            type: object
+            properties:
+              modifierId:
+                type: string
+                example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                format: uuid
+              optionId:
+                type: string
+                example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+                format: uuid
+        notes:
+          type: string
+
+    OrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        status:
+          type: string
+          example: "active"
+          enum:
+            - draft
+            - pending_payment
+            - paid
+            - preparing
+            - ready_for_pickup
+            - dispatched
+            - delivered
+            - cancelled
+        restaurantId:
+          type: string
+          format: uuid
+        restaurantName:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Pizza Margherita"
+              quantity:
+                type: integer
+              unitPriceCents:
+                type: integer
+              modifiers:
+                type: array
+                items:
+                  type: string
+              totalPriceCents:
+                type: integer
+        subtotalCents:
+          type: integer
+        deliveryFeeCents:
+          type: integer
+          example: 890
+        discountCents:
+          type: integer
+          example: 500
+        totalCents:
+          type: integer
+        promotionCode:
+          type: ['string', 'null']
+        promotionDiscountCents:
+          type: integer
+        estimatedMinutes:
+          type: integer
+        createdAt:
+          type: string
+          example: "2026-07-04T14:30:00Z"
+          format: date-time
+        paymentDeadline:
+          type: string
+          format: date-time
+
+    # ===== 07 - Pagamentos =====
+    PixPaymentResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        method:
+          type: string
+          example: pix
+        status:
+          type: string
+          example: pending
+        amountCents:
+          type: integer
+          example: 2990
+        pixQrCode:
+          type: string
+          description: QR code em base64
+        pixQrText:
+          type: string
+          description: Código copia-cola Pix
+        expiresAt:
+          type: string
+          format: date-time
+
+    CardPaymentResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          format: uuid
+        method:
+          type: string
+          example: credit_card
+        status:
+          type: string
+          example: paid
+        amountCents:
+          type: integer
+          example: 2990
+        cardLast4:
+          type: string
+        cardBrand:
+          type: string
+
+    # ===== 08 - Estados do Pedido =====
+    RestaurantOrder:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        status:
+          type: string
+        customerName:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: "Pizza Margherita"
+              quantity:
+                type: integer
+        totalCents:
+          type: integer
+        sla:
+          type: object
+          properties:
+            enteredAt:
+              type: string
+              format: date-time
+            timeoutAt:
+              type: string
+              format: date-time
+            elapsedPercent:
+              type: integer
+        createdAt:
+          type: string
+          example: "2026-07-04T14:30:00Z"
+          format: date-time
+
+    # ===== 10 - Roteirização =====
+    SingleLocationPing:
+      type: object
+      required: [lat, lon]
+      properties:
+        lat:
+          type: number
+          example: -23.562
+        lon:
+          type: number
+          example: -46.654
+        accuracy:
+          type: integer
+          example: 15
+        batteryLevel:
+          type: integer
+          example: 85
+        recordedAt:
+          type: string
+          example: "2026-07-04T14:30:00Z"
+          format: date-time
+
+    BatchLocationPing:
+      type: object
+      required: [pings]
+      properties:
+        pings:
+          type: array
+          maxItems: 60
+          items:
+            $ref: "#/components/schemas/SingleLocationPing"
+        source:
+          type: string
+          enum: [realtime, offline_batch]
+
+    SingleMilestone:
+      type: object
+      required: [milestone]
+      properties:
+        milestone:
+          type: string
+          example: "picked_up"
+          enum: [heading_to_restaurant, at_restaurant, heading_to_customer, arrived]
+        lat:
+          type: number
+          example: -23.562
+        lon:
+          type: number
+          example: -46.654
+        source:
+          type: string
+          enum: [manual, geofence, offline_batch]
+          default: manual
+
+    BatchMilestone:
+      type: object
+      required: [milestones]
+      properties:
+        milestones:
+          type: array
+          items:
+            type: object
+            properties:
+              milestone:
+                type: string
+                example: "picked_up"
+              lat:
+                type: number
+                example: -23.562
+              lon:
+                type: number
+                example: -46.654
+              recordedAt:
+                type: string
+                example: "2026-07-04T14:30:00Z"
+                format: date-time
+        source:
+          type: string
+          enum: [realtime, offline_batch]
+
+    ClientTrackingResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          example: in_progress
+        courier:
+          type: object
+          properties:
+            name:
+              type: string
+            photo:
+              type: string
+        position:
+          type: object
+          properties:
+            lat:
+              type: number
+              example: -23.562
+            lon:
+              type: number
+              example: -46.654
+            updatedAt:
+              type: string
+              example: "2026-07-04T14:35:00Z"
+              format: date-time
+        milestone:
+          type: string
+          example: "picked_up"
+        milestoneChangedAt:
+          type: string
+          format: date-time
+        milestoneLabel:
+          type: string
+        estimatedArrival:
+          type: ["string", "null"]
+          format: date-time
+        route:
+          type: object
+          properties:
+            pickup:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Pizza Margherita"
+                address:
+                  type: string
+                lat:
+                  type: number
+                lon:
+                  type: number
+            dropoff:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "Pizza Margherita"
+                address:
+                  type: string
+                lat:
+                  type: number
+                  example: -23.562
+                lon:
+                  type: number
+                  example: -46.654
+            polylineEncoded:
+              type: string
+            distanceKm:
+              type: number
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              milestone:
+                type: string
+                example: "picked_up"
+              label:
+                type: string
+                example: "casa"
+              at:
+                type: string
+                format: date-time
+              done:
+                type: boolean
+        version:
+          type: integer
+
+    # ===== 13 - Avaliações =====
+    SubmitRatingRequest:
+      type: object
+      properties:
+        restaurant:
+          type: object
+          properties:
+            score:
+              type: integer
+              example: 5
+              minimum: 1
+              maximum: 5
+            comment:
+              type: string
+              maxLength: 500
+          required: [score]
+        courier:
+          type: object
+          properties:
+            score:
+              type: integer
+              example: 5
+              minimum: 1
+              maximum: 5
+            comment:
+              type: string
+              maxLength: 500
+          required: [score]
+
+    # ===== 14 - Financeiro =====
+    FinanceSummaryResponse:
+      type: object
+      properties:
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              example: "pending_payment"
+              format: date
+            to:
+              type: string
+              format: date
+        summary:
+          type: object
+          properties:
+            grossCents:
+              type: integer
+            grossFormatted:
+              type: string
+            platformFeesCents:
+              type: integer
+            platformFeesFormatted:
+              type: string
+            deliveryFeesCents:
+              type: integer
+            deliveryFeesFormatted:
+              type: string
+            netCents:
+              type: integer
+            netFormatted:
+              type: string
+            orderCount:
+              type: integer
+            avgOrderCents:
+              type: integer
+            avgOrderFormatted:
+              type: string
+        dailyBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              grossCents:
+                type: integer
+              feesCents:
+                type: integer
+              netCents:
+                type: integer
+              orderCount:
+                type: integer
+
+    FinanceOrderEntry:
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: "a8f4d9d1-6ce0-4c2b-9f2a-1d5d0e6f7f11"
+          format: uuid
+        orderDate:
+          type: string
+          format: date-time
+        customerName:
+          type: string
+        items:
+          type: integer
+        grossCents:
+          type: integer
+        grossFormatted:
+          type: string
+        platformFeeCents:
+          type: integer
+        platformFeeFormatted:
+          type: string
+        deliveryFeeCents:
+          type: integer
+          example: 890
+        deliveryFeeFormatted:
+          type: string
+        netCents:
+          type: integer
+        netFormatted:
+          type: string
+        status:
+          type: string
+
+    PayoutEntry:
+      type: object
+      properties:
+        payoutId:
+          type: string
+          format: uuid
+        period:
+          type: object
+          properties:
+            from:
+              type: string
+              example: "pending_payment"
+              format: date
+            to:
+              type: string
+              example: "paid"
+              format: date
+        grossCents:
+          type: integer
+        feesCents:
+          type: integer
+        netCents:
+          type: integer
+        netFormatted:
+          type: string
+        status:
+          type: string
+          example: "active"
+        transferredAt:
+          type: ["string", "null"]
+          format: date-time
+        paymentMethod:
+          type: string
+
+    # ===== 15 - Cupons =====
+    CreateCouponRequest:
+      type: object
+      required: [code, type, startsAt, endsAt]
+      properties:
+        code:
+          type: string
+        type:
+          type: string
+          enum: [percent, fixed, free_delivery]
+        valuePercent:
+          type: number
+          example: 15
+        valueCents:
+          type: integer
+        maxDiscountCents:
+          type: integer
+        minOrderCents:
+          type: integer
+          example: 2000
+          default: 0
+        maxRedemptions:
+          type: integer
+          example: 1000
+        maxPerUser:
+          type: integer
+          default: 1
+        startsAt:
+          type: string
+          example: "2026-07-04T08:00:00Z"
+          format: date-time
+        endsAt:
+          type: string
+          example: "2026-07-18T23:59:00Z"
+          format: date-time
+        restaurantScope:
+          type: string
+          enum: [all, specific, exclude]
+          default: all
+        restaurantIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        firstPurchaseOnly:
+          type: boolean
+          default: false
+        subsidyType:
+          type: string
+          enum: [platform, restaurant, split]
+          default: platform
+        subsidyPlatformPercent:
+          type: number
+
+    CreateCampaignRequest:
+      type: object
+      required: [name, type, startsAt, endsAt]
+      properties:
+        name:
+          type: string
+          example: "Pizza Margherita"
+        description:
+          type: string
+        type:
+          type: string
+          enum: [coupon_based, fee_discount, seasonal]
+        budgetCents:
+          type: integer
+          example: 100000
+        startsAt:
+          type: string
+          example: "2026-07-04T08:00:00Z"
+          format: date-time
+        endsAt:
+          type: string
+          example: "2026-07-18T23:59:00Z"
+          format: date-time
+        targetMetric:
+          type: string
+          enum: [new_users, order_frequency, region_coverage]
+        roiGoalPercent:
+          type: number
+
+  # ===== WebSocket Paths =====
+  # Nota: O OpenAPI 3.1 suporta WebSocket via "webhooks" ou "path items"
+  # Estas são definidas conceitualmente abaixo para documentação.
