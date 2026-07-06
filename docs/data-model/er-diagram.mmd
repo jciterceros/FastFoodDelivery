@@ -1,0 +1,931 @@
+erDiagram
+
+  infra_service_registry {
+    uuid id PK
+    varchar service_name "not null"
+    varchar base_url "not null"
+    varchar health_endpoint "not null"
+    varchar health_status "not null"
+    timestamp last_health_check
+    varchar schema_version
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  infra_rate_limit_rules {
+    uuid id PK
+    varchar route_pattern "not null"
+    integer limit_per_second "not null"
+    integer limit_per_minute "not null"
+    integer limit_per_hour "not null"
+    varchar scope "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  infra_dead_letter_log {
+    uuid id PK
+    uuid event_id "not null"
+    varchar event_type "not null"
+    varchar source_service "not null"
+    text error_message
+    varchar error_code
+    integer retry_count "not null"
+    jsonb payload
+    timestamp failed_at "not null"
+    timestamp reprocessed_at
+    varchar status "not null"
+  }
+
+  auth_users {
+    uuid id PK
+    varchar email "not null"
+    timestamp email_verified_at
+    varchar phone
+    timestamp phone_verified_at
+    varchar password_hash "not null"
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_profiles {
+    uuid user_id PK
+    varchar full_name
+    date birth_date
+    boolean marketing_opt_in "not null"
+    varchar preferred_language "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_addresses {
+    uuid id PK
+    uuid user_id "not null"
+    varchar label
+    varchar zip_code
+    varchar street
+    varchar number
+    varchar complement
+    varchar neighborhood
+    varchar city
+    varchar state
+    varchar country "not null"
+    decimal latitude
+    decimal longitude
+    boolean is_default "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_consents {
+    uuid id PK
+    uuid user_id "not null"
+    varchar consent_type "not null"
+    varchar version "not null"
+    timestamp accepted_at "not null"
+    varchar source
+  }
+
+  user_refresh_tokens {
+    uuid id PK
+    uuid user_id "not null"
+    varchar token_hash "not null"
+    varchar device_id
+    timestamp expires_at "not null"
+    timestamp revoked_at
+    timestamp created_at "not null"
+  }
+
+  user_user_devices {
+    uuid id PK
+    uuid user_id "not null"
+    varchar device_id "not null"
+    varchar platform
+    varchar push_token
+    timestamp last_seen_at
+    timestamp created_at "not null"
+  }
+
+  onboarding_onboarding_applications {
+    uuid id PK
+    uuid user_id "not null"
+    varchar type "not null"
+    varchar status "not null"
+    timestamp submitted_at
+    timestamp reviewed_at
+    uuid reviewer_id
+    varchar rejection_reason
+    text rejection_note
+    uuid resubmitted_from
+    jsonb metadata
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_application_documents {
+    uuid id PK
+    uuid application_id "not null"
+    varchar doc_type "not null"
+    varchar storage_key "not null"
+    varchar original_filename
+    varchar mime_type
+    integer file_size_bytes
+    varchar checksum
+    timestamp uploaded_at "not null"
+  }
+
+  onboarding_restaurant_profiles {
+    uuid id PK
+    uuid application_id "not null"
+    uuid owner_user_id "not null"
+    varchar legal_name "not null"
+    varchar trading_name
+    varchar cnpj "not null"
+    varchar cpf_responsavel
+    uuid address_id
+    varchar phone
+    jsonb operating_hours_json
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_courier_profiles {
+    uuid id PK
+    uuid application_id "not null"
+    uuid user_id "not null"
+    varchar vehicle_type
+    varchar license_number "not null"
+    date license_expiry
+    varchar license_category
+    varchar vehicle_plate
+    integer vehicle_year
+    varchar vehicle_color
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_moderation_audit_log {
+    uuid id PK
+    uuid application_id "not null"
+    varchar action "not null"
+    varchar from_status
+    varchar to_status
+    uuid reviewer_id
+    text comment
+    timestamp created_at "not null"
+  }
+
+  menu_menu_categories {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar name "not null"
+    varchar description
+    integer sort_order "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_items {
+    uuid id PK
+    uuid category_id "not null"
+    varchar name "not null"
+    text description
+    integer price_cents "not null"
+    varchar image_url
+    boolean is_available "not null"
+    integer preparation_time_seconds
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_modifiers {
+    uuid id PK
+    uuid item_id "not null"
+    varchar name "not null"
+    integer min_selections "not null"
+    integer max_selections "not null"
+    boolean is_required "not null"
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_modifier_options {
+    uuid id PK
+    uuid modifier_id "not null"
+    varchar name "not null"
+    integer price_delta_cents "not null"
+    boolean is_default "not null"
+    boolean is_available "not null"
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_restaurant_schedules {
+    uuid id PK
+    uuid restaurant_id "not null"
+    smallint day_of_week "not null"
+    time open_time "not null"
+    time close_time "not null"
+    boolean is_closed "not null"
+  }
+
+  menu_menu_snapshots {
+    uuid id PK
+    uuid restaurant_id "not null"
+    integer version "not null"
+    jsonb snapshot "not null"
+    timestamp published_at
+    timestamp created_at "not null"
+  }
+
+  coverage_delivery_zones {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar zone_type "not null"
+    geometry geometry "not null"
+    decimal radius_km
+    integer base_fee_cents "not null"
+    integer additional_fee_per_km_cents "not null"
+    integer min_order_cents "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  coverage_platform_regions {
+    uuid id PK
+    varchar name "not null"
+    geometry geometry "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+  }
+
+  coverage_coverage_cache {
+    varchar geohash PK
+    uuid[] restaurant_ids "not null"
+    uuid platform_region_id
+    integer base_fee_cents "not null"
+    timestamp cached_at "not null"
+    timestamp expires_at "not null"
+  }
+
+  coverage_address_geocoding_cache {
+    uuid id PK
+    varchar address_hash "not null"
+    decimal latitude "not null"
+    decimal longitude "not null"
+    varchar formatted_address
+    varchar place_id
+    varchar provider "not null"
+    timestamp cached_at "not null"
+    timestamp expires_at "not null"
+  }
+
+  coverage_delivery_fee_tiers {
+    uuid id PK
+    uuid restaurant_id "not null"
+    uuid zone_id "not null"
+    decimal min_distance_km "not null"
+    decimal max_distance_km
+    integer fee_cents "not null"
+    timestamp created_at "not null"
+  }
+
+  search_restaurant_search_fallback {
+    uuid restaurant_id PK
+    varchar name "not null"
+    text description
+    varchar cuisine_type
+    decimal avg_rating
+    integer review_count "not null"
+    integer delivery_fee_cents "not null"
+    boolean is_open "not null"
+    integer last_menu_version "not null"
+    geography location
+    tsvector full_text
+  }
+
+  order_orders {
+    uuid id PK
+    uuid user_id "not null"
+    uuid restaurant_id "not null"
+    varchar status "not null"
+    integer subtotal_cents "not null"
+    integer delivery_fee_cents "not null"
+    integer discount_cents "not null"
+    integer total_cents "not null"
+    varchar promotion_code
+    decimal delivery_latitude
+    decimal delivery_longitude
+    jsonb delivery_address_snapshot
+    integer estimated_minutes
+    varchar idempotency_key "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  order_order_items {
+    uuid id PK
+    uuid order_id "not null"
+    uuid item_id "not null"
+    varchar name "not null"
+    integer quantity "not null"
+    integer unit_price_cents "not null"
+    jsonb modifiers_snapshot
+    integer total_price_cents "not null"
+    varchar notes
+  }
+
+  order_inventory_reservations {
+    uuid id PK
+    uuid item_id "not null"
+    uuid order_id "not null"
+    integer quantity "not null"
+    varchar status "not null"
+    timestamp expires_at "not null"
+    timestamp created_at "not null"
+  }
+
+  payment_payments {
+    uuid id PK
+    uuid order_id "not null"
+    varchar method "not null"
+    integer amount_cents "not null"
+    varchar status "not null"
+    varchar gateway "not null"
+    varchar gateway_payment_id
+    jsonb gateway_response
+    text pix_qr_code
+    varchar pix_qr_text
+    timestamp pix_expires_at
+    integer refunded_cents "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  payment_payment_tokens {
+    uuid id PK
+    uuid user_id "not null"
+    varchar gateway "not null"
+    varchar gateway_token "not null"
+    varchar brand
+    varchar last4
+    varchar cardholder_name
+    smallint exp_month
+    smallint exp_year
+    boolean is_default "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+  }
+
+  payment_payment_webhooks {
+    uuid id PK
+    varchar idempotency_key "not null"
+    varchar gateway "not null"
+    varchar event_type "not null"
+    varchar payload_hash "not null"
+    jsonb raw_payload "not null"
+    timestamp processed_at
+  }
+
+  payment_refunds {
+    uuid id PK
+    uuid payment_id "not null"
+    integer amount_cents "not null"
+    varchar reason
+    varchar gateway_refund_id
+    uuid created_by "not null"
+    timestamp created_at "not null"
+  }
+
+  order_order_sla_config {
+    uuid id PK
+    uuid restaurant_id "not null"
+    integer preparation_timeout_minutes "not null"
+    integer pickup_timeout_minutes "not null"
+    integer auto_cancel_after_minutes "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  order_order_status_history {
+    uuid id PK
+    uuid order_id "not null"
+    varchar from_status
+    varchar to_status "not null"
+    uuid changed_by
+    varchar changed_by_role
+    varchar reason
+    integer elapsed_seconds
+    timestamp created_at "not null"
+  }
+
+  dispatch_delivery_offers {
+    uuid id PK
+    uuid order_id "not null"
+    uuid courier_id "not null"
+    smallint attempt "not null"
+    varchar status "not null"
+    timestamp expires_at "not null"
+    timestamp responded_at
+    varchar rejection_reason
+    timestamp created_at "not null"
+  }
+
+  dispatch_delivery_assignments {
+    uuid id PK
+    uuid order_id "not null"
+    uuid courier_id "not null"
+    uuid offer_id
+    varchar status "not null"
+    timestamp assigned_at "not null"
+    timestamp picked_up_at
+    timestamp completed_at
+    timestamp cancelled_at
+    varchar cancellation_reason
+  }
+
+  dispatch_courier_sessions {
+    uuid id PK
+    uuid courier_id "not null"
+    boolean is_online "not null"
+    varchar current_geohash
+    decimal last_lat
+    decimal last_lon
+    varchar status "not null"
+    uuid current_delivery_id
+    smallint battery_level
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  dispatch_escalation_queue {
+    uuid id PK
+    uuid order_id "not null"
+    smallint attempts "not null"
+    timestamp last_attempt_at
+    timestamp escalated_at "not null"
+    varchar status "not null"
+    uuid resolved_by
+    timestamp resolved_at
+    text notes
+  }
+
+  dispatch_courier_availability_history {
+    uuid id PK
+    uuid courier_id "not null"
+    varchar previous_status
+    varchar new_status "not null"
+    varchar reason
+    varchar geohash
+    timestamp created_at "not null"
+  }
+
+  tracking_delivery_tracking {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    uuid order_id "not null"
+    varchar current_milestone "not null"
+    decimal last_lat
+    decimal last_lon
+    varchar last_geohash
+    timestamp started_at
+    timestamp picked_up_at
+    timestamp arrived_at
+    timestamp completed_at
+    timestamp estimated_eta
+    timestamp updated_at "not null"
+  }
+
+  tracking_location_pings {
+    uuid id
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    decimal lat "not null"
+    decimal lon "not null"
+    smallint accuracy
+    varchar geohash
+    smallint battery_level
+    timestamp recorded_at "not null"
+    timestamp ingested_at "not null"
+    varchar source "not null"
+  }
+
+  tracking_delivery_milestones {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    varchar milestone "not null"
+    decimal lat
+    decimal lon
+    varchar geohash
+    varchar source "not null"
+    timestamp created_at "not null"
+  }
+
+  tracking_delivery_routes {
+    uuid id PK
+    uuid delivery_id "not null"
+    varchar pickup_address
+    decimal pickup_lat
+    decimal pickup_lon
+    varchar dropoff_address
+    decimal dropoff_lat
+    decimal dropoff_lon
+    text polyline_encoded
+    decimal distance_km
+    integer estimated_duration_minutes
+    timestamp cached_at "not null"
+    timestamp expires_at
+  }
+
+  tracking_courier_daily_tracks {
+    uuid id PK
+    uuid courier_id "not null"
+    date date "not null"
+    integer total_deliveries "not null"
+    decimal total_distance_km "not null"
+    integer total_active_minutes "not null"
+    text[] geohashes_visited
+    timestamp created_at "not null"
+  }
+
+  realtime_tracking_sessions {
+    uuid id PK
+    uuid order_id "not null"
+    uuid user_id "not null"
+    varchar device_id
+    varchar session_token "not null"
+    varchar status "not null"
+    timestamp connected_at "not null"
+    timestamp disconnected_at
+    timestamp last_activity_at
+    integer messages_sent "not null"
+    varchar ip_address
+    varchar user_agent
+  }
+
+  realtime_tracking_snapshots {
+    uuid id PK
+    uuid order_id "not null"
+    decimal courier_lat
+    decimal courier_lon
+    varchar courier_geohash
+    varchar milestone
+    timestamp milestone_changed_at
+    timestamp estimated_eta
+    decimal pickup_lat
+    decimal pickup_lon
+    decimal dropoff_lat
+    decimal dropoff_lon
+    text polyline_encoded
+    integer version "not null"
+    timestamp updated_at "not null"
+  }
+
+  verification_delivery_verification_codes {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid order_id "not null"
+    varchar code_hash "not null"
+    varchar code_prefix
+    varchar status "not null"
+    timestamp generated_at "not null"
+    timestamp expires_at "not null"
+    timestamp confirmed_at
+    uuid confirmed_by_courier_id
+    uuid confirmed_by_admin_id
+    timestamp revoked_at
+    varchar revocation_reason
+  }
+
+  verification_delivery_verification_attempts {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    varchar code_submitted "not null"
+    varchar code_submitted_prefix
+    varchar result "not null"
+    decimal courier_lat
+    decimal courier_lon
+    varchar geohash
+    varchar ip_address
+    timestamp created_at "not null"
+  }
+
+  verification_delivery_disputes {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid order_id "not null"
+    varchar opened_by "not null"
+    varchar reason "not null"
+    varchar status "not null"
+    varchar resolution
+    uuid resolved_by
+    timestamp resolved_at
+    jsonb evidence
+    timestamp created_at "not null"
+  }
+
+  rating_order_ratings {
+    uuid id PK
+    uuid order_id "not null"
+    uuid user_id "not null"
+    varchar target_type "not null"
+    uuid target_id "not null"
+    smallint score "not null"
+    varchar comment
+    varchar comment_status "not null"
+    jsonb moderation_result
+    boolean is_edited "not null"
+    timestamp edited_at
+    timestamp created_at "not null"
+  }
+
+  rating_rating_aggregates {
+    uuid id PK
+    varchar target_type "not null"
+    uuid target_id "not null"
+    decimal avg_score "not null"
+    integer total_ratings "not null"
+    jsonb distribution
+    timestamp last_rating_at
+    timestamp updated_at "not null"
+  }
+
+  rating_moderation_blocklist {
+    uuid id PK
+    varchar word "not null"
+    varchar category
+    boolean is_regex "not null"
+    varchar severity "not null"
+    timestamp created_at "not null"
+  }
+
+  finance_bank_accounts {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar bank_code "not null"
+    varchar agency "not null"
+    varchar account "not null"
+    varchar account_digit "not null"
+    varchar account_type
+    varchar pix_key
+    varchar holder_name "not null"
+    varchar holder_document "not null"
+    varchar holder_type "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  finance_payout_config {
+    uuid id PK
+    uuid restaurant_id "not null"
+    smallint cycle_days "not null"
+    date next_payout_date "not null"
+    integer min_payout_cents "not null"
+    boolean auto_payout "not null"
+    uuid default_bank_account_id
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  finance_payouts {
+    uuid id PK
+    uuid restaurant_id "not null"
+    date period_start "not null"
+    date period_end "not null"
+    integer gross_cents "not null"
+    integer fees_cents "not null"
+    integer net_cents "not null"
+    varchar status "not null"
+    varchar payment_method
+    uuid bank_account_id
+    varchar transfer_id
+    timestamp transferred_at
+    varchar failure_reason
+    timestamp created_at "not null"
+  }
+
+  finance_daily_restaurant_rollups {
+    uuid id PK
+    uuid restaurant_id "not null"
+    date date "not null"
+    integer gross_cents "not null"
+    integer platform_fees_cents "not null"
+    integer delivery_fees_cents "not null"
+    integer net_cents "not null"
+    integer refunds_cents "not null"
+    integer adjustments_cents "not null"
+    integer order_count "not null"
+    varchar payout_status
+    uuid payout_id
+    timestamp updated_at "not null"
+  }
+
+  finance_ledger_entries {
+    uuid id
+    uuid restaurant_id "not null"
+    uuid order_id
+    varchar entry_type "not null"
+    integer amount_cents "not null"
+    varchar description
+    uuid reference_id
+    varchar reference_type
+    varchar status "not null"
+    timestamp settled_at
+    timestamp created_at "not null"
+  }
+
+  finance_reconciliation_log {
+    uuid id PK
+    date date "not null"
+    integer total_ledger_cents "not null"
+    integer total_gateway_cents "not null"
+    integer difference_cents "not null"
+    varchar status "not null"
+    jsonb details
+    timestamp created_at "not null"
+  }
+
+  promotion_campaigns {
+    uuid id PK
+    varchar name "not null"
+    text description
+    varchar type "not null"
+    integer budget_cents "not null"
+    integer budget_spent_cents "not null"
+    timestamp starts_at "not null"
+    timestamp ends_at "not null"
+    varchar status "not null"
+    varchar target_metric
+    decimal roi_goal_percent
+    uuid created_by
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_coupons {
+    uuid id PK
+    varchar code "not null"
+    uuid campaign_id "not null"
+    varchar type "not null"
+    integer value_cents
+    decimal value_percent
+    integer max_discount_cents
+    integer min_order_cents "not null"
+    integer max_redemptions
+    integer max_per_user "not null"
+    timestamp starts_at "not null"
+    timestamp ends_at "not null"
+    varchar restaurant_scope
+    uuid[] restaurant_ids
+    varchar region_scope
+    varchar region_geohashes
+    boolean first_purchase_only "not null"
+    varchar subsidy_type
+    decimal subsidy_platform_percent
+    boolean is_active "not null"
+    uuid created_by
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_coupon_redemptions {
+    uuid id PK
+    uuid coupon_id "not null"
+    uuid user_id "not null"
+    uuid order_id "not null"
+    integer discount_cents "not null"
+    integer original_total_cents "not null"
+    integer final_total_cents "not null"
+    jsonb rules_snapshot
+    integer subsidy_platform_cents "not null"
+    integer subsidy_restaurant_cents "not null"
+    timestamp created_at "not null"
+  }
+
+  promotion_delivery_fee_rules {
+    uuid id PK
+    uuid zone_id "not null"
+    jsonb region_geometry
+    integer fee_cents "not null"
+    integer min_order_cents "not null"
+    integer free_delivery_above_cents
+    timestamp valid_from "not null"
+    timestamp valid_to
+    integer priority "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_campaign_daily_stats {
+    uuid id PK
+    uuid campaign_id "not null"
+    date date "not null"
+    integer redemptions "not null"
+    integer discount_cents "not null"
+    integer gross_order_cents "not null"
+    integer new_users "not null"
+    timestamp created_at "not null"
+  }
+
+  %% Relationships
+
+  auth_users ||--|| user_user_profiles : "references"
+  auth_users ||--o{ user_user_addresses : "references"
+  auth_users ||--o{ user_user_consents : "references"
+  auth_users ||--o{ user_refresh_tokens : "references"
+  auth_users ||--o{ user_user_devices : "references"
+  auth_users ||--o{ onboarding_onboarding_applications : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_onboarding_applications : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_application_documents : "references"
+  onboarding_onboarding_applications ||--|| onboarding_restaurant_profiles : "references"
+  auth_users ||--o{ onboarding_restaurant_profiles : "references"
+  user_user_addresses ||--o{ onboarding_restaurant_profiles : "references"
+  onboarding_onboarding_applications ||--|| onboarding_courier_profiles : "references"
+  auth_users ||--o{ onboarding_courier_profiles : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_moderation_audit_log : "references"
+  auth_users ||--o{ onboarding_moderation_audit_log : "references"
+  onboarding_restaurant_profiles ||--o{ menu_menu_categories : "references"
+  menu_menu_categories ||--o{ menu_menu_items : "references"
+  menu_menu_items ||--o{ menu_menu_modifiers : "references"
+  menu_menu_modifiers ||--o{ menu_menu_modifier_options : "references"
+  onboarding_restaurant_profiles ||--o{ menu_restaurant_schedules : "references"
+  onboarding_restaurant_profiles ||--o{ menu_menu_snapshots : "references"
+  onboarding_restaurant_profiles ||--o{ coverage_delivery_zones : "references"
+  coverage_platform_regions ||--o{ coverage_coverage_cache : "references"
+  onboarding_restaurant_profiles ||--o{ coverage_delivery_fee_tiers : "references"
+  coverage_delivery_zones ||--o{ coverage_delivery_fee_tiers : "references"
+  onboarding_restaurant_profiles ||--|| search_restaurant_search_fallback : "references"
+  auth_users ||--o{ order_orders : "references"
+  onboarding_restaurant_profiles ||--o{ order_orders : "references"
+  order_orders ||--o{ order_order_items : "references"
+  menu_menu_items ||--o{ order_order_items : "references"
+  menu_menu_items ||--o{ order_inventory_reservations : "references"
+  order_orders ||--o{ order_inventory_reservations : "references"
+  order_orders ||--o{ payment_payments : "references"
+  auth_users ||--o{ payment_payment_tokens : "references"
+  payment_payments ||--o{ payment_refunds : "references"
+  auth_users ||--o{ payment_refunds : "references"
+  onboarding_restaurant_profiles ||--|| order_order_sla_config : "references"
+  order_orders ||--o{ order_order_status_history : "references"
+  auth_users ||--o{ order_order_status_history : "references"
+  order_orders ||--o{ dispatch_delivery_offers : "references"
+  auth_users ||--o{ dispatch_delivery_offers : "references"
+  order_orders ||--|| dispatch_delivery_assignments : "references"
+  auth_users ||--o{ dispatch_delivery_assignments : "references"
+  dispatch_delivery_offers ||--o{ dispatch_delivery_assignments : "references"
+  auth_users ||--|| dispatch_courier_sessions : "references"
+  dispatch_delivery_assignments ||--o{ dispatch_courier_sessions : "references"
+  order_orders ||--|| dispatch_escalation_queue : "references"
+  auth_users ||--o{ dispatch_escalation_queue : "references"
+  auth_users ||--o{ dispatch_courier_availability_history : "references"
+  dispatch_delivery_assignments ||--|| tracking_delivery_tracking : "references"
+  auth_users ||--o{ tracking_delivery_tracking : "references"
+  order_orders ||--o{ tracking_delivery_tracking : "references"
+  dispatch_delivery_assignments ||--o{ tracking_location_pings : "references"
+  auth_users ||--o{ tracking_location_pings : "references"
+  dispatch_delivery_assignments ||--o{ tracking_delivery_milestones : "references"
+  auth_users ||--o{ tracking_delivery_milestones : "references"
+  dispatch_delivery_assignments ||--|| tracking_delivery_routes : "references"
+  auth_users ||--o{ tracking_courier_daily_tracks : "references"
+  order_orders ||--o{ realtime_tracking_sessions : "references"
+  auth_users ||--o{ realtime_tracking_sessions : "references"
+  order_orders ||--|| realtime_tracking_snapshots : "references"
+  dispatch_delivery_assignments ||--|| verification_delivery_verification_codes : "references"
+  order_orders ||--o{ verification_delivery_verification_codes : "references"
+  auth_users ||--o{ verification_delivery_verification_codes : "references"
+  dispatch_delivery_assignments ||--o{ verification_delivery_verification_attempts : "references"
+  auth_users ||--o{ verification_delivery_verification_attempts : "references"
+  dispatch_delivery_assignments ||--|| verification_delivery_disputes : "references"
+  order_orders ||--o{ verification_delivery_disputes : "references"
+  auth_users ||--o{ verification_delivery_disputes : "references"
+  order_orders ||--o{ rating_order_ratings : "references"
+  auth_users ||--o{ rating_order_ratings : "references"
+  onboarding_restaurant_profiles ||--|| finance_bank_accounts : "references"
+  onboarding_restaurant_profiles ||--|| finance_payout_config : "references"
+  finance_bank_accounts ||--o{ finance_payout_config : "references"
+  onboarding_restaurant_profiles ||--o{ finance_payouts : "references"
+  finance_bank_accounts ||--o{ finance_payouts : "references"
+  onboarding_restaurant_profiles ||--o{ finance_daily_restaurant_rollups : "references"
+  finance_payouts ||--o{ finance_daily_restaurant_rollups : "references"
+  onboarding_restaurant_profiles ||--o{ finance_ledger_entries : "references"
+  order_orders ||--o{ finance_ledger_entries : "references"
+  auth_users ||--o{ promotion_campaigns : "references"
+  promotion_campaigns ||--o{ promotion_coupons : "references"
+  auth_users ||--o{ promotion_coupons : "references"
+  promotion_coupons ||--o{ promotion_coupon_redemptions : "references"
+  auth_users ||--o{ promotion_coupon_redemptions : "references"
+  order_orders ||--|| promotion_coupon_redemptions : "references"
+  coverage_delivery_zones ||--o{ promotion_delivery_fee_rules : "references"
+  promotion_campaigns ||--o{ promotion_campaign_daily_stats : "references"

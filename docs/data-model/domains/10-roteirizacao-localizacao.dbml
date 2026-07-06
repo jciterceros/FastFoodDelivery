@@ -1,0 +1,96 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 10: Roteirizacao e Localizacao
+// Arquivo: 10-roteirizacao-localizacao.dbml
+// Schema(s): tracking
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table tracking_delivery_tracking {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    order_id uuid  [not null]
+    current_milestone varchar(32)  [not null, default: `'ASSIGNED'`]
+    last_lat decimal(10,7) 
+    last_lon decimal(10,7) 
+    last_geohash varchar(12) 
+    started_at timestamp 
+    picked_up_at timestamp 
+    arrived_at timestamp 
+    completed_at timestamp 
+    estimated_eta timestamp 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(delivery_id)'
+}
+
+Table tracking_location_pings {
+    id uuid  [default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    lat decimal(10,7)  [not null]
+    lon decimal(10,7)  [not null]
+    accuracy smallint 
+    geohash varchar(12) 
+    battery_level smallint 
+    recorded_at timestamp  [not null]
+    ingested_at timestamp  [not null, default: `NOW()`]
+    source varchar(32)  [not null, default: `'APP'`]
+}
+
+Table tracking_delivery_milestones {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    milestone varchar(32)  [not null]
+    lat decimal(10,7) 
+    lon decimal(10,7) 
+    geohash varchar(12) 
+    source varchar(32)  [not null, default: `'APP'`]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table tracking_delivery_routes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    pickup_address varchar(512) 
+    pickup_lat decimal(10,7) 
+    pickup_lon decimal(10,7) 
+    dropoff_address varchar(512) 
+    dropoff_lat decimal(10,7) 
+    dropoff_lon decimal(10,7) 
+    polyline_encoded text 
+    distance_km decimal(8,2) 
+    estimated_duration_minutes integer 
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp 
+    note: 'unique(delivery_id)'
+}
+
+Table tracking_courier_daily_tracks {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    courier_id uuid  [not null]
+    date date  [not null]
+    total_deliveries integer  [not null, default: `0`]
+    total_distance_km decimal(8,2)  [not null, default: `0`]
+    total_active_minutes integer  [not null, default: `0`]
+    geohashes_visited text[] 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(courier_id, date)'
+}
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: tracking_courier_daily_tracks.courier_id > auth_users.id
+// Ref: tracking_delivery_milestones.courier_id > auth_users.id
+// Ref: tracking_delivery_tracking.courier_id > auth_users.id
+// Ref: tracking_location_pings.courier_id > auth_users.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: tracking_delivery_tracking.order_id > order_orders.id
+
+// → [09] matching-entregador: Matching Entregador
+// Ref: tracking_delivery_milestones.delivery_id > dispatch_delivery_assignments.id
+// Ref: tracking_delivery_routes.delivery_id > dispatch_delivery_assignments.id
+// Ref: tracking_delivery_tracking.delivery_id > dispatch_delivery_assignments.id
+// Ref: tracking_location_pings.delivery_id > dispatch_delivery_assignments.id

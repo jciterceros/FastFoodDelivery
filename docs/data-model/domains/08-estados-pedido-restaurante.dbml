@@ -1,0 +1,43 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 08: Estados do Pedido
+// Arquivo: 08-estados-pedido-restaurante.dbml
+// Schema(s): order
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+// order_order_sla_config — Configuração de SLA por restaurante
+Table order_order_sla_config {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    preparation_timeout_minutes integer  [not null, default: `30`]
+    pickup_timeout_minutes integer  [not null, default: `15`]
+    auto_cancel_after_minutes integer  [not null, default: `60`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+// order_order_status_history — Histórico de transições de estado
+Table order_order_status_history {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    from_status varchar(32) 
+    to_status varchar(32)  [not null]
+    changed_by uuid 
+    changed_by_role varchar(32) 
+    reason varchar(255) 
+    elapsed_seconds integer 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: order_order_status_history.order_id > order_orders.id
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: order_order_status_history.changed_by > auth_users.id
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: order_order_sla_config.restaurant_id > onboarding_restaurant_profiles.id

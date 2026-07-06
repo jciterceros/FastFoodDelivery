@@ -1,0 +1,52 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 13: Avaliacoes
+// Arquivo: 13-avaliacoes.dbml
+// Schema(s): rating
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table rating_order_ratings {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    user_id uuid  [not null]
+    target_type varchar(32)  [not null]
+    target_id uuid  [not null]
+    score smallint  [not null]
+    comment varchar(1000) 
+    comment_status varchar(32)  [not null, default: `'PENDING'`]
+    moderation_result jsonb 
+    is_edited boolean  [not null, default: `false`]
+    edited_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(order_id, target_type)'
+}
+
+Table rating_rating_aggregates {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    target_type varchar(32)  [not null]
+    target_id uuid  [not null]
+    avg_score decimal(3,2)  [not null, default: `0`]
+    total_ratings integer  [not null, default: `0`]
+    distribution jsonb 
+    last_rating_at timestamp 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(target_type, target_id)'
+}
+
+Table rating_moderation_blocklist {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    word varchar(255)  [not null]
+    category varchar(64) 
+    is_regex boolean  [not null, default: `false`]
+    severity varchar(32)  [not null, default: `'LOW'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(word)'
+}
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: rating_order_ratings.user_id > auth_users.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: rating_order_ratings.order_id > order_orders.id

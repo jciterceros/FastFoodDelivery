@@ -1,0 +1,101 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 06: Carrinho e Pedido
+// Arquivo: 06-carrinho-pedido.dbml
+// Schema(s): order
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+// order_orders — Pedido confirmado — agregado central do fluxo transacional
+Table order_orders {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    restaurant_id uuid  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    subtotal_cents integer  [not null, default: `0`]
+    delivery_fee_cents integer  [not null, default: `0`]
+    discount_cents integer  [not null, default: `0`]
+    total_cents integer  [not null, default: `0`]
+    promotion_code varchar(64) 
+    delivery_latitude decimal(10,7) 
+    delivery_longitude decimal(10,7) 
+    delivery_address_snapshot jsonb 
+    estimated_minutes integer 
+    idempotency_key varchar(255)  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(idempotency_key)'
+}
+
+// order_order_items — Itens do pedido (snapshot de preços)
+Table order_order_items {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    item_id uuid  [not null]
+    name varchar(255)  [not null]
+    quantity integer  [not null]
+    unit_price_cents integer  [not null]
+    modifiers_snapshot jsonb 
+    total_price_cents integer  [not null]
+    notes varchar(512) 
+}
+
+// order_inventory_reservations — Reserva de estoque no checkout
+Table order_inventory_reservations {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    item_id uuid  [not null]
+    order_id uuid  [not null]
+    quantity integer  [not null]
+    status varchar(32)  [not null, default: `'RESERVED'`]
+    expires_at timestamp  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: order_inventory_reservations.order_id > order_orders.id
+Ref: order_order_items.order_id > order_orders.id
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: order_orders.user_id > auth_users.id
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: order_orders.restaurant_id > onboarding_restaurant_profiles.id
+
+// → [03] gestao-cardapio: Gestao de Cardapio
+// Ref: order_inventory_reservations.item_id > menu_menu_items.id
+// Ref: order_order_items.item_id > menu_menu_items.id
+
+// ── Referenced by Other Domains ──
+
+// ← [07] pagamentos: Pagamentos
+// Ref: payment_payments.order_id > order_orders.id
+
+// ← [08] estados-pedido-restaurante: Estados do Pedido
+// Ref: order_order_status_history.order_id > order_orders.id
+
+// ← [09] matching-entregador: Matching Entregador
+// Ref: dispatch_delivery_assignments.order_id > order_orders.id
+// Ref: dispatch_delivery_offers.order_id > order_orders.id
+// Ref: dispatch_escalation_queue.order_id > order_orders.id
+
+// ← [10] roteirizacao-localizacao: Roteirizacao e Localizacao
+// Ref: tracking_delivery_tracking.order_id > order_orders.id
+
+// ← [11] rastreamento-tempo-real: Rastreamento Tempo Real
+// Ref: realtime_tracking_sessions.order_id > order_orders.id
+// Ref: realtime_tracking_snapshots.order_id > order_orders.id
+
+// ← [12] confirmacao-entrega: Confirmacao de Entrega
+// Ref: verification_delivery_disputes.order_id > order_orders.id
+// Ref: verification_delivery_verification_codes.order_id > order_orders.id
+
+// ← [13] avaliacoes: Avaliacoes
+// Ref: rating_order_ratings.order_id > order_orders.id
+
+// ← [14] painel-financeiro-restaurante: Painel Financeiro
+// Ref: finance_ledger_entries.order_id > order_orders.id
+
+// ← [15] cupons-campanhas: Cupons e Campanhas
+// Ref: promotion_coupon_redemptions.order_id > order_orders.id

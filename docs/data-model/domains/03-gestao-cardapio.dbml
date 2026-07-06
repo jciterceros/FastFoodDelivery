@@ -1,0 +1,93 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 03: Gestao de Cardapio
+// Arquivo: 03-gestao-cardapio.dbml
+// Schema(s): menu
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table menu_menu_categories {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    name varchar(255)  [not null]
+    description varchar(512) 
+    sort_order integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_items {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    category_id uuid  [not null]
+    name varchar(255)  [not null]
+    description text 
+    price_cents integer  [not null]
+    image_url varchar(512) 
+    is_available boolean  [not null, default: `true`]
+    preparation_time_seconds integer 
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_modifiers {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    item_id uuid  [not null]
+    name varchar(255)  [not null]
+    min_selections integer  [not null, default: `0`]
+    max_selections integer  [not null, default: `1`]
+    is_required boolean  [not null, default: `false`]
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_modifier_options {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    modifier_id uuid  [not null]
+    name varchar(255)  [not null]
+    price_delta_cents integer  [not null, default: `0`]
+    is_default boolean  [not null, default: `false`]
+    is_available boolean  [not null, default: `true`]
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_restaurant_schedules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    day_of_week smallint  [not null]
+    open_time time  [not null]
+    close_time time  [not null]
+    is_closed boolean  [not null, default: `false`]
+    note: 'unique(restaurant_id, day_of_week)'
+}
+
+Table menu_menu_snapshots {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    version integer  [not null]
+    snapshot jsonb  [not null]
+    published_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: menu_menu_items.category_id > menu_menu_categories.id
+Ref: menu_menu_modifier_options.modifier_id > menu_menu_modifiers.id
+Ref: menu_menu_modifiers.item_id > menu_menu_items.id
+
+// ── References to Other Domains ──
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: menu_menu_categories.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: menu_menu_snapshots.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: menu_restaurant_schedules.restaurant_id > onboarding_restaurant_profiles.id
+
+// ── Referenced by Other Domains ──
+
+// ← [06] carrinho-pedido: Carrinho e Pedido
+// Ref: order_inventory_reservations.item_id > menu_menu_items.id
+// Ref: order_order_items.item_id > menu_menu_items.id

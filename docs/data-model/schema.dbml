@@ -1,0 +1,1091 @@
+// ====================================================================
+// FastFoodDelivery — Database Schema (DBML)
+// Schema completo: 64 tabelas, 16 schemas, todas as relacoes
+// Database: PostgreSQL 15+
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+// ── Dominios ──
+//  [00] domains/00-plataforma-transversal.dbml
+//  [01] domains/01-identidade-usuarios.dbml
+//  [02] domains/02-onboarding-admin.dbml
+//  [03] domains/03-gestao-cardapio.dbml
+//  [04] domains/04-geolocalizacao-cobertura.dbml
+//  [05] domains/05-busca-filtros.dbml
+//  [06] domains/06-carrinho-pedido.dbml
+//  [07] domains/07-pagamentos.dbml
+//  [08] domains/08-estados-pedido-restaurante.dbml
+//  [09] domains/09-matching-entregador.dbml
+//  [10] domains/10-roteirizacao-localizacao.dbml
+//  [11] domains/11-rastreamento-tempo-real.dbml
+//  [12] domains/12-confirmacao-entrega.dbml
+//  [13] domains/13-avaliacoes.dbml
+//  [14] domains/14-painel-financeiro-restaurante.dbml
+//  [15] domains/15-cupons-campanhas.dbml
+
+// ====================================================================
+// TABELAS
+// ====================================================================
+
+// ====================================================================
+// Dominio 00: Plataforma Transversal
+// ====================================================================
+
+Table infra_service_registry {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    service_name varchar(64)  [not null]
+    base_url varchar(256)  [not null]
+    health_endpoint varchar(128)  [not null, default: `'/HEALTH'`]
+    health_status varchar(16)  [not null, default: `'HEALTHY'`]
+    last_health_check timestamp 
+    schema_version varchar(16) 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(service_name)'
+}
+
+Table infra_rate_limit_rules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    route_pattern varchar(256)  [not null]
+    limit_per_second integer  [not null]
+    limit_per_minute integer  [not null]
+    limit_per_hour integer  [not null]
+    scope varchar(32)  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table infra_dead_letter_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    event_id uuid  [not null]
+    event_type varchar(64)  [not null]
+    source_service varchar(64)  [not null]
+    error_message text 
+    error_code varchar(32) 
+    retry_count integer  [not null, default: `0`]
+    payload jsonb 
+    failed_at timestamp  [not null, default: `NOW()`]
+    reprocessed_at timestamp 
+    status varchar(16)  [not null, default: `'PENDING'`]
+}
+
+// ====================================================================
+// Dominio 01: Identidade e Usuarios
+// ====================================================================
+
+// --- schema: auth ---
+
+Table auth_users {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    email varchar(255)  [not null]
+    email_verified_at timestamp 
+    phone varchar(32) 
+    phone_verified_at timestamp 
+    password_hash varchar(255)  [not null]
+    status varchar(32)  [not null, default: `'ACTIVE'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(email)'
+}
+
+// --- schema: user ---
+
+// user_user_profiles — Dados do perfil do usuário
+Table user_user_profiles {
+    user_id uuid  [pk]
+    full_name varchar(255) 
+    birth_date date 
+    marketing_opt_in boolean  [not null, default: `false`]
+    preferred_language varchar(10)  [not null, default: `'PT-BR'`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_addresses — Endereços do usuário
+Table user_user_addresses {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    label varchar(64) 
+    zip_code varchar(16) 
+    street varchar(255) 
+    number varchar(16) 
+    complement varchar(255) 
+    neighborhood varchar(128) 
+    city varchar(128) 
+    state varchar(64) 
+    country varchar(64)  [not null, default: `'BRASIL'`]
+    latitude decimal(10,7) 
+    longitude decimal(10,7) 
+    is_default boolean  [not null, default: `false`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_consents — Registro de consentimento LGPD
+Table user_user_consents {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    consent_type varchar(64)  [not null]
+    version varchar(16)  [not null]
+    accepted_at timestamp  [not null, default: `NOW()`]
+    source varchar(64) 
+}
+
+// user_refresh_tokens — Tokens de refresh rotativos
+Table user_refresh_tokens {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    token_hash varchar(255)  [not null]
+    device_id varchar(128) 
+    expires_at timestamp  [not null]
+    revoked_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_devices — Dispositivos do usuário
+Table user_user_devices {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    device_id varchar(255)  [not null]
+    platform varchar(32) 
+    push_token varchar(512) 
+    last_seen_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(device_id)'
+}
+
+// ====================================================================
+// Dominio 02: Onboarding Admin
+// ====================================================================
+
+Table onboarding_onboarding_applications {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    type varchar(32)  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    submitted_at timestamp 
+    reviewed_at timestamp 
+    reviewer_id uuid 
+    rejection_reason varchar(64) 
+    rejection_note text 
+    resubmitted_from uuid 
+    metadata jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table onboarding_application_documents {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    doc_type varchar(64)  [not null]
+    storage_key varchar(512)  [not null]
+    original_filename varchar(255) 
+    mime_type varchar(64) 
+    file_size_bytes integer 
+    checksum varchar(64) 
+    uploaded_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id, doc_type)'
+}
+
+Table onboarding_restaurant_profiles {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    owner_user_id uuid  [not null]
+    legal_name varchar(255)  [not null]
+    trading_name varchar(255) 
+    cnpj varchar(18)  [not null]
+    cpf_responsavel varchar(14) 
+    address_id uuid 
+    phone varchar(32) 
+    operating_hours_json jsonb 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id)'
+    note: 'unique(cnpj)'
+}
+
+Table onboarding_courier_profiles {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    user_id uuid  [not null]
+    vehicle_type varchar(32) 
+    license_number varchar(32)  [not null]
+    license_expiry date 
+    license_category varchar(8) 
+    vehicle_plate varchar(16) 
+    vehicle_year integer 
+    vehicle_color varchar(32) 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id)'
+    note: 'unique(license_number)'
+}
+
+Table onboarding_moderation_audit_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    action varchar(64)  [not null]
+    from_status varchar(32) 
+    to_status varchar(32) 
+    reviewer_id uuid 
+    comment text 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 03: Gestao de Cardapio
+// ====================================================================
+
+Table menu_menu_categories {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    name varchar(255)  [not null]
+    description varchar(512) 
+    sort_order integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_items {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    category_id uuid  [not null]
+    name varchar(255)  [not null]
+    description text 
+    price_cents integer  [not null]
+    image_url varchar(512) 
+    is_available boolean  [not null, default: `true`]
+    preparation_time_seconds integer 
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_modifiers {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    item_id uuid  [not null]
+    name varchar(255)  [not null]
+    min_selections integer  [not null, default: `0`]
+    max_selections integer  [not null, default: `1`]
+    is_required boolean  [not null, default: `false`]
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_menu_modifier_options {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    modifier_id uuid  [not null]
+    name varchar(255)  [not null]
+    price_delta_cents integer  [not null, default: `0`]
+    is_default boolean  [not null, default: `false`]
+    is_available boolean  [not null, default: `true`]
+    sort_order integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table menu_restaurant_schedules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    day_of_week smallint  [not null]
+    open_time time  [not null]
+    close_time time  [not null]
+    is_closed boolean  [not null, default: `false`]
+    note: 'unique(restaurant_id, day_of_week)'
+}
+
+Table menu_menu_snapshots {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    version integer  [not null]
+    snapshot jsonb  [not null]
+    published_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 04: Geolocalizacao e Cobertura
+// ====================================================================
+
+Table coverage_delivery_zones {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    zone_type varchar(32)  [not null]
+    geometry geometry  [not null]
+    radius_km decimal(8,2) 
+    base_fee_cents integer  [not null, default: `0`]
+    additional_fee_per_km_cents integer  [not null, default: `0`]
+    min_order_cents integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table coverage_platform_regions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    name varchar(255)  [not null]
+    geometry geometry  [not null]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table coverage_coverage_cache {
+    geohash varchar(12)  [pk]
+    restaurant_ids uuid[]  [not null]
+    platform_region_id uuid 
+    base_fee_cents integer  [not null, default: `0`]
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+}
+
+Table coverage_address_geocoding_cache {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    address_hash varchar(64)  [not null]
+    latitude decimal(10,7)  [not null]
+    longitude decimal(10,7)  [not null]
+    formatted_address varchar(512) 
+    place_id varchar(255) 
+    provider varchar(32)  [not null, default: `'OPENSTREETMAP'`]
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+    note: 'unique(address_hash)'
+}
+
+Table coverage_delivery_fee_tiers {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    zone_id uuid  [not null]
+    min_distance_km decimal(8,2)  [not null, default: `0`]
+    max_distance_km decimal(8,2) 
+    fee_cents integer  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 05: Busca e Filtros
+// ====================================================================
+
+Table search_restaurant_search_fallback {
+    restaurant_id uuid  [pk]
+    name varchar(255)  [not null]
+    description text 
+    cuisine_type varchar(64) 
+    avg_rating decimal(3,2) 
+    review_count integer  [not null, default: `0`]
+    delivery_fee_cents integer  [not null, default: `0`]
+    is_open boolean  [not null, default: `false`]
+    last_menu_version integer  [not null, default: `0`]
+    location geography 
+    full_text tsvector 
+}
+
+// ====================================================================
+// Dominio 06: Carrinho e Pedido
+// ====================================================================
+
+// order_orders — Pedido confirmado — agregado central do fluxo transacional
+Table order_orders {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    restaurant_id uuid  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    subtotal_cents integer  [not null, default: `0`]
+    delivery_fee_cents integer  [not null, default: `0`]
+    discount_cents integer  [not null, default: `0`]
+    total_cents integer  [not null, default: `0`]
+    promotion_code varchar(64) 
+    delivery_latitude decimal(10,7) 
+    delivery_longitude decimal(10,7) 
+    delivery_address_snapshot jsonb 
+    estimated_minutes integer 
+    idempotency_key varchar(255)  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(idempotency_key)'
+}
+
+// order_order_items — Itens do pedido (snapshot de preços)
+Table order_order_items {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    item_id uuid  [not null]
+    name varchar(255)  [not null]
+    quantity integer  [not null]
+    unit_price_cents integer  [not null]
+    modifiers_snapshot jsonb 
+    total_price_cents integer  [not null]
+    notes varchar(512) 
+}
+
+// order_inventory_reservations — Reserva de estoque no checkout
+Table order_inventory_reservations {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    item_id uuid  [not null]
+    order_id uuid  [not null]
+    quantity integer  [not null]
+    status varchar(32)  [not null, default: `'RESERVED'`]
+    expires_at timestamp  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 07: Pagamentos
+// ====================================================================
+
+Table payment_payments {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    method varchar(32)  [not null]
+    amount_cents integer  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    gateway varchar(32)  [not null]
+    gateway_payment_id varchar(255) 
+    gateway_response jsonb 
+    pix_qr_code text 
+    pix_qr_text varchar(512) 
+    pix_expires_at timestamp 
+    refunded_cents integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table payment_payment_tokens {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    gateway varchar(32)  [not null]
+    gateway_token varchar(255)  [not null]
+    brand varchar(32) 
+    last4 varchar(4) 
+    cardholder_name varchar(255) 
+    exp_month smallint 
+    exp_year smallint 
+    is_default boolean  [not null, default: `false`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(gateway_token)'
+}
+
+Table payment_payment_webhooks {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    idempotency_key varchar(255)  [not null]
+    gateway varchar(32)  [not null]
+    event_type varchar(64)  [not null]
+    payload_hash varchar(64)  [not null]
+    raw_payload jsonb  [not null]
+    processed_at timestamp 
+    note: 'unique(idempotency_key)'
+}
+
+Table payment_refunds {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    payment_id uuid  [not null]
+    amount_cents integer  [not null]
+    reason varchar(255) 
+    gateway_refund_id varchar(255) 
+    created_by uuid  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 08: Estados do Pedido
+// ====================================================================
+
+// order_order_sla_config — Configuração de SLA por restaurante
+Table order_order_sla_config {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    preparation_timeout_minutes integer  [not null, default: `30`]
+    pickup_timeout_minutes integer  [not null, default: `15`]
+    auto_cancel_after_minutes integer  [not null, default: `60`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+// order_order_status_history — Histórico de transições de estado
+Table order_order_status_history {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    from_status varchar(32) 
+    to_status varchar(32)  [not null]
+    changed_by uuid 
+    changed_by_role varchar(32) 
+    reason varchar(255) 
+    elapsed_seconds integer 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 09: Matching Entregador
+// ====================================================================
+
+Table dispatch_delivery_offers {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    courier_id uuid  [not null]
+    attempt smallint  [not null, default: `1`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    expires_at timestamp  [not null]
+    responded_at timestamp 
+    rejection_reason varchar(64) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table dispatch_delivery_assignments {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    courier_id uuid  [not null]
+    offer_id uuid 
+    status varchar(32)  [not null, default: `'ASSIGNED'`]
+    assigned_at timestamp  [not null, default: `NOW()`]
+    picked_up_at timestamp 
+    completed_at timestamp 
+    cancelled_at timestamp 
+    cancellation_reason varchar(255) 
+    note: 'unique(order_id)'
+}
+
+Table dispatch_courier_sessions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    courier_id uuid  [not null]
+    is_online boolean  [not null, default: `false`]
+    current_geohash varchar(12) 
+    last_lat decimal(10,7) 
+    last_lon decimal(10,7) 
+    status varchar(32)  [not null, default: `'OFFLINE'`]
+    current_delivery_id uuid 
+    battery_level smallint 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(courier_id)'
+}
+
+Table dispatch_escalation_queue {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    attempts smallint  [not null, default: `0`]
+    last_attempt_at timestamp 
+    escalated_at timestamp  [not null, default: `NOW()`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    resolved_by uuid 
+    resolved_at timestamp 
+    notes text 
+    note: 'unique(order_id)'
+}
+
+Table dispatch_courier_availability_history {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    courier_id uuid  [not null]
+    previous_status varchar(32) 
+    new_status varchar(32)  [not null]
+    reason varchar(255) 
+    geohash varchar(12) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ====================================================================
+// Dominio 10: Roteirizacao e Localizacao
+// ====================================================================
+
+Table tracking_delivery_tracking {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    order_id uuid  [not null]
+    current_milestone varchar(32)  [not null, default: `'ASSIGNED'`]
+    last_lat decimal(10,7) 
+    last_lon decimal(10,7) 
+    last_geohash varchar(12) 
+    started_at timestamp 
+    picked_up_at timestamp 
+    arrived_at timestamp 
+    completed_at timestamp 
+    estimated_eta timestamp 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(delivery_id)'
+}
+
+Table tracking_location_pings {
+    id uuid  [default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    lat decimal(10,7)  [not null]
+    lon decimal(10,7)  [not null]
+    accuracy smallint 
+    geohash varchar(12) 
+    battery_level smallint 
+    recorded_at timestamp  [not null]
+    ingested_at timestamp  [not null, default: `NOW()`]
+    source varchar(32)  [not null, default: `'APP'`]
+}
+
+Table tracking_delivery_milestones {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    milestone varchar(32)  [not null]
+    lat decimal(10,7) 
+    lon decimal(10,7) 
+    geohash varchar(12) 
+    source varchar(32)  [not null, default: `'APP'`]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table tracking_delivery_routes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    pickup_address varchar(512) 
+    pickup_lat decimal(10,7) 
+    pickup_lon decimal(10,7) 
+    dropoff_address varchar(512) 
+    dropoff_lat decimal(10,7) 
+    dropoff_lon decimal(10,7) 
+    polyline_encoded text 
+    distance_km decimal(8,2) 
+    estimated_duration_minutes integer 
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp 
+    note: 'unique(delivery_id)'
+}
+
+Table tracking_courier_daily_tracks {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    courier_id uuid  [not null]
+    date date  [not null]
+    total_deliveries integer  [not null, default: `0`]
+    total_distance_km decimal(8,2)  [not null, default: `0`]
+    total_active_minutes integer  [not null, default: `0`]
+    geohashes_visited text[] 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(courier_id, date)'
+}
+
+// ====================================================================
+// Dominio 11: Rastreamento Tempo Real
+// ====================================================================
+
+Table realtime_tracking_sessions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    user_id uuid  [not null]
+    device_id varchar(255) 
+    session_token varchar(255)  [not null]
+    status varchar(32)  [not null, default: `'CONNECTED'`]
+    connected_at timestamp  [not null, default: `NOW()`]
+    disconnected_at timestamp 
+    last_activity_at timestamp 
+    messages_sent integer  [not null, default: `0`]
+    ip_address varchar(45) 
+    user_agent varchar(512) 
+    note: 'unique(session_token)'
+}
+
+Table realtime_tracking_snapshots {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    courier_lat decimal(10,7) 
+    courier_lon decimal(10,7) 
+    courier_geohash varchar(12) 
+    milestone varchar(32) 
+    milestone_changed_at timestamp 
+    estimated_eta timestamp 
+    pickup_lat decimal(10,7) 
+    pickup_lon decimal(10,7) 
+    dropoff_lat decimal(10,7) 
+    dropoff_lon decimal(10,7) 
+    polyline_encoded text 
+    version integer  [not null, default: `1`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(order_id)'
+}
+
+// ====================================================================
+// Dominio 12: Confirmacao de Entrega
+// ====================================================================
+
+Table verification_delivery_verification_codes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    order_id uuid  [not null]
+    code_hash varchar(255)  [not null]
+    code_prefix varchar(8) 
+    status varchar(32)  [not null, default: `'ACTIVE'`]
+    generated_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+    confirmed_at timestamp 
+    confirmed_by_courier_id uuid 
+    confirmed_by_admin_id uuid 
+    revoked_at timestamp 
+    revocation_reason varchar(255) 
+    note: 'unique(delivery_id)'
+}
+
+Table verification_delivery_verification_attempts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    code_submitted varchar(255)  [not null]
+    code_submitted_prefix varchar(8) 
+    result varchar(32)  [not null]
+    courier_lat decimal(10,7) 
+    courier_lon decimal(10,7) 
+    geohash varchar(12) 
+    ip_address varchar(45) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table verification_delivery_disputes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    order_id uuid  [not null]
+    opened_by varchar(32)  [not null]
+    reason varchar(255)  [not null]
+    status varchar(32)  [not null, default: `'OPEN'`]
+    resolution varchar(255) 
+    resolved_by uuid 
+    resolved_at timestamp 
+    evidence jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(delivery_id)'
+}
+
+// ====================================================================
+// Dominio 13: Avaliacoes
+// ====================================================================
+
+Table rating_order_ratings {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    user_id uuid  [not null]
+    target_type varchar(32)  [not null]
+    target_id uuid  [not null]
+    score smallint  [not null]
+    comment varchar(1000) 
+    comment_status varchar(32)  [not null, default: `'PENDING'`]
+    moderation_result jsonb 
+    is_edited boolean  [not null, default: `false`]
+    edited_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(order_id, target_type)'
+}
+
+Table rating_rating_aggregates {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    target_type varchar(32)  [not null]
+    target_id uuid  [not null]
+    avg_score decimal(3,2)  [not null, default: `0`]
+    total_ratings integer  [not null, default: `0`]
+    distribution jsonb 
+    last_rating_at timestamp 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(target_type, target_id)'
+}
+
+Table rating_moderation_blocklist {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    word varchar(255)  [not null]
+    category varchar(64) 
+    is_regex boolean  [not null, default: `false`]
+    severity varchar(32)  [not null, default: `'LOW'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(word)'
+}
+
+// ====================================================================
+// Dominio 14: Painel Financeiro
+// ====================================================================
+
+Table finance_bank_accounts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    bank_code varchar(8)  [not null]
+    agency varchar(16)  [not null]
+    account varchar(32)  [not null]
+    account_digit varchar(4)  [not null]
+    account_type varchar(16)  [default: `'CORRENTE'`]
+    pix_key varchar(255) 
+    holder_name varchar(255)  [not null]
+    holder_document varchar(18)  [not null]
+    holder_type varchar(8)  [not null, default: `'FISICA'`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+Table finance_payout_config {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    cycle_days smallint  [not null, default: `7`]
+    next_payout_date date  [not null]
+    min_payout_cents integer  [not null, default: `0`]
+    auto_payout boolean  [not null, default: `true`]
+    default_bank_account_id uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+Table finance_payouts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    period_start date  [not null]
+    period_end date  [not null]
+    gross_cents integer  [not null, default: `0`]
+    fees_cents integer  [not null, default: `0`]
+    net_cents integer  [not null, default: `0`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    payment_method varchar(32) 
+    bank_account_id uuid 
+    transfer_id varchar(255) 
+    transferred_at timestamp 
+    failure_reason varchar(512) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table finance_daily_restaurant_rollups {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    date date  [not null]
+    gross_cents integer  [not null, default: `0`]
+    platform_fees_cents integer  [not null, default: `0`]
+    delivery_fees_cents integer  [not null, default: `0`]
+    net_cents integer  [not null, default: `0`]
+    refunds_cents integer  [not null, default: `0`]
+    adjustments_cents integer  [not null, default: `0`]
+    order_count integer  [not null, default: `0`]
+    payout_status varchar(32) 
+    payout_id uuid 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id, date)'
+}
+
+Table finance_ledger_entries {
+    id uuid  [default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    order_id uuid 
+    entry_type varchar(64)  [not null]
+    amount_cents integer  [not null]
+    description varchar(512) 
+    reference_id uuid 
+    reference_type varchar(64) 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    settled_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table finance_reconciliation_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    date date  [not null]
+    total_ledger_cents integer  [not null, default: `0`]
+    total_gateway_cents integer  [not null, default: `0`]
+    difference_cents integer  [not null, default: `0`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    details jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(date)'
+}
+
+// ====================================================================
+// Dominio 15: Cupons e Campanhas
+// ====================================================================
+
+Table promotion_campaigns {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    name varchar(255)  [not null]
+    description text 
+    type varchar(32)  [not null]
+    budget_cents integer  [not null, default: `0`]
+    budget_spent_cents integer  [not null, default: `0`]
+    starts_at timestamp  [not null]
+    ends_at timestamp  [not null]
+    status varchar(32)  [not null, default: `'DRAFT'`]
+    target_metric varchar(64) 
+    roi_goal_percent decimal(5,2) 
+    created_by uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table promotion_coupons {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    code varchar(64)  [not null]
+    campaign_id uuid  [not null]
+    type varchar(32)  [not null]
+    value_cents integer 
+    value_percent decimal(5,2) 
+    max_discount_cents integer 
+    min_order_cents integer  [not null, default: `0`]
+    max_redemptions integer 
+    max_per_user integer  [not null, default: `1`]
+    starts_at timestamp  [not null]
+    ends_at timestamp  [not null]
+    restaurant_scope varchar(32) 
+    restaurant_ids uuid[] 
+    region_scope varchar(32) 
+    region_geohashes varchar[] 
+    first_purchase_only boolean  [not null, default: `false`]
+    subsidy_type varchar(32) 
+    subsidy_platform_percent decimal(5,2) 
+    is_active boolean  [not null, default: `true`]
+    created_by uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(code)'
+}
+
+Table promotion_coupon_redemptions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    coupon_id uuid  [not null]
+    user_id uuid  [not null]
+    order_id uuid  [not null]
+    discount_cents integer  [not null]
+    original_total_cents integer  [not null]
+    final_total_cents integer  [not null]
+    rules_snapshot jsonb 
+    subsidy_platform_cents integer  [not null, default: `0`]
+    subsidy_restaurant_cents integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(order_id)'
+}
+
+Table promotion_delivery_fee_rules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    zone_id uuid  [not null]
+    region_geometry jsonb 
+    fee_cents integer  [not null, default: `0`]
+    min_order_cents integer  [not null, default: `0`]
+    free_delivery_above_cents integer 
+    valid_from timestamp  [not null]
+    valid_to timestamp 
+    priority integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table promotion_campaign_daily_stats {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    campaign_id uuid  [not null]
+    date date  [not null]
+    redemptions integer  [not null, default: `0`]
+    discount_cents integer  [not null, default: `0`]
+    gross_order_cents integer  [not null, default: `0`]
+    new_users integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(campaign_id, date)'
+}
+
+
+// ====================================================================
+// RELACIONAMENTOS COMPLETOS
+// Todas as chaves estrangeiras — intra e cross-domínio
+// ====================================================================
+
+// ── Dominio 01: Identidade e Usuarios
+Ref: user_refresh_tokens.user_id > auth_users.id  // intra
+Ref: user_user_addresses.user_id > auth_users.id  // intra
+Ref: user_user_consents.user_id > auth_users.id  // intra
+Ref: user_user_devices.user_id > auth_users.id  // intra
+Ref: user_user_profiles.user_id > auth_users.id  // intra
+// ── Dominio 02: Onboarding Admin
+Ref: onboarding_application_documents.application_id > onboarding_onboarding_applications.id  // intra
+Ref: onboarding_courier_profiles.application_id > onboarding_onboarding_applications.id  // intra
+Ref: onboarding_courier_profiles.user_id > auth_users.id  // → dominio 01
+Ref: onboarding_moderation_audit_log.application_id > onboarding_onboarding_applications.id  // intra
+Ref: onboarding_moderation_audit_log.reviewer_id > auth_users.id  // → dominio 01
+Ref: onboarding_onboarding_applications.resubmitted_from > onboarding_onboarding_applications.id  // intra
+Ref: onboarding_onboarding_applications.reviewer_id > auth_users.id  // → dominio 01
+Ref: onboarding_onboarding_applications.user_id > auth_users.id  // → dominio 01
+Ref: onboarding_restaurant_profiles.address_id > user_user_addresses.id  // → dominio 01
+Ref: onboarding_restaurant_profiles.application_id > onboarding_onboarding_applications.id  // intra
+Ref: onboarding_restaurant_profiles.owner_user_id > auth_users.id  // → dominio 01
+// ── Dominio 03: Gestao de Cardapio
+Ref: menu_menu_categories.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: menu_menu_items.category_id > menu_menu_categories.id  // intra
+Ref: menu_menu_modifier_options.modifier_id > menu_menu_modifiers.id  // intra
+Ref: menu_menu_modifiers.item_id > menu_menu_items.id  // intra
+Ref: menu_menu_snapshots.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: menu_restaurant_schedules.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+// ── Dominio 04: Geolocalizacao e Cobertura
+Ref: coverage_coverage_cache.platform_region_id > coverage_platform_regions.id  // intra
+Ref: coverage_delivery_fee_tiers.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: coverage_delivery_fee_tiers.zone_id > coverage_delivery_zones.id  // intra
+Ref: coverage_delivery_zones.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+// ── Dominio 05: Busca e Filtros
+Ref: search_restaurant_search_fallback.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+// ── Dominio 06: Carrinho e Pedido
+Ref: order_inventory_reservations.item_id > menu_menu_items.id  // → dominio 03
+Ref: order_inventory_reservations.order_id > order_orders.id  // intra
+Ref: order_order_items.item_id > menu_menu_items.id  // → dominio 03
+Ref: order_order_items.order_id > order_orders.id  // intra
+Ref: order_orders.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: order_orders.user_id > auth_users.id  // → dominio 01
+// ── Dominio 07: Pagamentos
+Ref: payment_payment_tokens.user_id > auth_users.id  // → dominio 01
+Ref: payment_payments.order_id > order_orders.id  // → dominio 06
+Ref: payment_refunds.created_by > auth_users.id  // → dominio 01
+Ref: payment_refunds.payment_id > payment_payments.id  // intra
+// ── Dominio 08: Estados do Pedido
+Ref: order_order_sla_config.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: order_order_status_history.changed_by > auth_users.id  // → dominio 01
+Ref: order_order_status_history.order_id > order_orders.id  // → dominio 06
+// ── Dominio 09: Matching Entregador
+Ref: dispatch_courier_availability_history.courier_id > auth_users.id  // → dominio 01
+Ref: dispatch_courier_sessions.courier_id > auth_users.id  // → dominio 01
+Ref: dispatch_courier_sessions.current_delivery_id > dispatch_delivery_assignments.id  // intra
+Ref: dispatch_delivery_assignments.courier_id > auth_users.id  // → dominio 01
+Ref: dispatch_delivery_assignments.offer_id > dispatch_delivery_offers.id  // intra
+Ref: dispatch_delivery_assignments.order_id > order_orders.id  // → dominio 06
+Ref: dispatch_delivery_offers.courier_id > auth_users.id  // → dominio 01
+Ref: dispatch_delivery_offers.order_id > order_orders.id  // → dominio 06
+Ref: dispatch_escalation_queue.order_id > order_orders.id  // → dominio 06
+Ref: dispatch_escalation_queue.resolved_by > auth_users.id  // → dominio 01
+// ── Dominio 10: Roteirizacao e Localizacao
+Ref: tracking_courier_daily_tracks.courier_id > auth_users.id  // → dominio 01
+Ref: tracking_delivery_milestones.courier_id > auth_users.id  // → dominio 01
+Ref: tracking_delivery_milestones.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: tracking_delivery_routes.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: tracking_delivery_tracking.courier_id > auth_users.id  // → dominio 01
+Ref: tracking_delivery_tracking.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: tracking_delivery_tracking.order_id > order_orders.id  // → dominio 06
+Ref: tracking_location_pings.courier_id > auth_users.id  // → dominio 01
+Ref: tracking_location_pings.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+// ── Dominio 11: Rastreamento Tempo Real
+Ref: realtime_tracking_sessions.order_id > order_orders.id  // → dominio 06
+Ref: realtime_tracking_sessions.user_id > auth_users.id  // → dominio 01
+Ref: realtime_tracking_snapshots.order_id > order_orders.id  // → dominio 06
+// ── Dominio 12: Confirmacao de Entrega
+Ref: verification_delivery_disputes.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: verification_delivery_disputes.order_id > order_orders.id  // → dominio 06
+Ref: verification_delivery_disputes.resolved_by > auth_users.id  // → dominio 01
+Ref: verification_delivery_verification_attempts.courier_id > auth_users.id  // → dominio 01
+Ref: verification_delivery_verification_attempts.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: verification_delivery_verification_codes.confirmed_by_admin_id > auth_users.id  // → dominio 01
+Ref: verification_delivery_verification_codes.confirmed_by_courier_id > auth_users.id  // → dominio 01
+Ref: verification_delivery_verification_codes.delivery_id > dispatch_delivery_assignments.id  // → dominio 09
+Ref: verification_delivery_verification_codes.order_id > order_orders.id  // → dominio 06
+// ── Dominio 13: Avaliacoes
+Ref: rating_order_ratings.order_id > order_orders.id  // → dominio 06
+Ref: rating_order_ratings.user_id > auth_users.id  // → dominio 01
+// ── Dominio 14: Painel Financeiro
+Ref: finance_bank_accounts.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: finance_daily_restaurant_rollups.payout_id > finance_payouts.id  // intra
+Ref: finance_daily_restaurant_rollups.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: finance_ledger_entries.order_id > order_orders.id  // → dominio 06
+Ref: finance_ledger_entries.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: finance_payout_config.default_bank_account_id > finance_bank_accounts.id  // intra
+Ref: finance_payout_config.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+Ref: finance_payouts.bank_account_id > finance_bank_accounts.id  // intra
+Ref: finance_payouts.restaurant_id > onboarding_restaurant_profiles.id  // → dominio 02
+// ── Dominio 15: Cupons e Campanhas
+Ref: promotion_campaign_daily_stats.campaign_id > promotion_campaigns.id  // intra
+Ref: promotion_campaigns.created_by > auth_users.id  // → dominio 01
+Ref: promotion_coupon_redemptions.coupon_id > promotion_coupons.id  // intra
+Ref: promotion_coupon_redemptions.order_id > order_orders.id  // → dominio 06
+Ref: promotion_coupon_redemptions.user_id > auth_users.id  // → dominio 01
+Ref: promotion_coupons.campaign_id > promotion_campaigns.id  // intra
+Ref: promotion_coupons.created_by > auth_users.id  // → dominio 01
+Ref: promotion_delivery_fee_rules.zone_id > coverage_delivery_zones.id  // → dominio 04

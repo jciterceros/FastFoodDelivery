@@ -1,0 +1,76 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 04: Geolocalizacao e Cobertura
+// Arquivo: 04-geolocalizacao-cobertura.dbml
+// Schema(s): coverage
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table coverage_delivery_zones {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    zone_type varchar(32)  [not null]
+    geometry geometry  [not null]
+    radius_km decimal(8,2) 
+    base_fee_cents integer  [not null, default: `0`]
+    additional_fee_per_km_cents integer  [not null, default: `0`]
+    min_order_cents integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table coverage_platform_regions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    name varchar(255)  [not null]
+    geometry geometry  [not null]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table coverage_coverage_cache {
+    geohash varchar(12)  [pk]
+    restaurant_ids uuid[]  [not null]
+    platform_region_id uuid 
+    base_fee_cents integer  [not null, default: `0`]
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+}
+
+Table coverage_address_geocoding_cache {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    address_hash varchar(64)  [not null]
+    latitude decimal(10,7)  [not null]
+    longitude decimal(10,7)  [not null]
+    formatted_address varchar(512) 
+    place_id varchar(255) 
+    provider varchar(32)  [not null, default: `'OPENSTREETMAP'`]
+    cached_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+    note: 'unique(address_hash)'
+}
+
+Table coverage_delivery_fee_tiers {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    zone_id uuid  [not null]
+    min_distance_km decimal(8,2)  [not null, default: `0`]
+    max_distance_km decimal(8,2) 
+    fee_cents integer  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: coverage_coverage_cache.platform_region_id > coverage_platform_regions.id
+Ref: coverage_delivery_fee_tiers.zone_id > coverage_delivery_zones.id
+
+// ── References to Other Domains ──
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: coverage_delivery_fee_tiers.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: coverage_delivery_zones.restaurant_id > onboarding_restaurant_profiles.id
+
+// ── Referenced by Other Domains ──
+
+// ← [15] cupons-campanhas: Cupons e Campanhas
+// Ref: promotion_delivery_fee_rules.zone_id > coverage_delivery_zones.id

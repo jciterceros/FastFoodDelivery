@@ -1,0 +1,73 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 07: Pagamentos
+// Arquivo: 07-pagamentos.dbml
+// Schema(s): payment
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table payment_payments {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    order_id uuid  [not null]
+    method varchar(32)  [not null]
+    amount_cents integer  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    gateway varchar(32)  [not null]
+    gateway_payment_id varchar(255) 
+    gateway_response jsonb 
+    pix_qr_code text 
+    pix_qr_text varchar(512) 
+    pix_expires_at timestamp 
+    refunded_cents integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table payment_payment_tokens {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    gateway varchar(32)  [not null]
+    gateway_token varchar(255)  [not null]
+    brand varchar(32) 
+    last4 varchar(4) 
+    cardholder_name varchar(255) 
+    exp_month smallint 
+    exp_year smallint 
+    is_default boolean  [not null, default: `false`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(gateway_token)'
+}
+
+Table payment_payment_webhooks {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    idempotency_key varchar(255)  [not null]
+    gateway varchar(32)  [not null]
+    event_type varchar(64)  [not null]
+    payload_hash varchar(64)  [not null]
+    raw_payload jsonb  [not null]
+    processed_at timestamp 
+    note: 'unique(idempotency_key)'
+}
+
+Table payment_refunds {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    payment_id uuid  [not null]
+    amount_cents integer  [not null]
+    reason varchar(255) 
+    gateway_refund_id varchar(255) 
+    created_by uuid  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: payment_refunds.payment_id > payment_payments.id
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: payment_payment_tokens.user_id > auth_users.id
+// Ref: payment_refunds.created_by > auth_users.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: payment_payments.order_id > order_orders.id

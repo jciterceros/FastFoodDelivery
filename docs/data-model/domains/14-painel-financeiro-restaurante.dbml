@@ -1,0 +1,115 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 14: Painel Financeiro
+// Arquivo: 14-painel-financeiro-restaurante.dbml
+// Schema(s): finance
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table finance_bank_accounts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    bank_code varchar(8)  [not null]
+    agency varchar(16)  [not null]
+    account varchar(32)  [not null]
+    account_digit varchar(4)  [not null]
+    account_type varchar(16)  [default: `'CORRENTE'`]
+    pix_key varchar(255) 
+    holder_name varchar(255)  [not null]
+    holder_document varchar(18)  [not null]
+    holder_type varchar(8)  [not null, default: `'FISICA'`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+Table finance_payout_config {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    cycle_days smallint  [not null, default: `7`]
+    next_payout_date date  [not null]
+    min_payout_cents integer  [not null, default: `0`]
+    auto_payout boolean  [not null, default: `true`]
+    default_bank_account_id uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id)'
+}
+
+Table finance_payouts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    period_start date  [not null]
+    period_end date  [not null]
+    gross_cents integer  [not null, default: `0`]
+    fees_cents integer  [not null, default: `0`]
+    net_cents integer  [not null, default: `0`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    payment_method varchar(32) 
+    bank_account_id uuid 
+    transfer_id varchar(255) 
+    transferred_at timestamp 
+    failure_reason varchar(512) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table finance_daily_restaurant_rollups {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    date date  [not null]
+    gross_cents integer  [not null, default: `0`]
+    platform_fees_cents integer  [not null, default: `0`]
+    delivery_fees_cents integer  [not null, default: `0`]
+    net_cents integer  [not null, default: `0`]
+    refunds_cents integer  [not null, default: `0`]
+    adjustments_cents integer  [not null, default: `0`]
+    order_count integer  [not null, default: `0`]
+    payout_status varchar(32) 
+    payout_id uuid 
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(restaurant_id, date)'
+}
+
+Table finance_ledger_entries {
+    id uuid  [default: `uuid_generate_v4()`]
+    restaurant_id uuid  [not null]
+    order_id uuid 
+    entry_type varchar(64)  [not null]
+    amount_cents integer  [not null]
+    description varchar(512) 
+    reference_id uuid 
+    reference_type varchar(64) 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    settled_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table finance_reconciliation_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    date date  [not null]
+    total_ledger_cents integer  [not null, default: `0`]
+    total_gateway_cents integer  [not null, default: `0`]
+    difference_cents integer  [not null, default: `0`]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    details jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(date)'
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: finance_daily_restaurant_rollups.payout_id > finance_payouts.id
+Ref: finance_payout_config.default_bank_account_id > finance_bank_accounts.id
+Ref: finance_payouts.bank_account_id > finance_bank_accounts.id
+
+// ── References to Other Domains ──
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: finance_bank_accounts.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_daily_restaurant_rollups.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_ledger_entries.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_payout_config.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_payouts.restaurant_id > onboarding_restaurant_profiles.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: finance_ledger_entries.order_id > order_orders.id

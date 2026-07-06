@@ -1,0 +1,140 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 01: Identidade e Usuarios
+// Arquivo: 01-identidade-usuarios.dbml
+// Schema(s): auth, user
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table auth_users {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    email varchar(255)  [not null]
+    email_verified_at timestamp 
+    phone varchar(32) 
+    phone_verified_at timestamp 
+    password_hash varchar(255)  [not null]
+    status varchar(32)  [not null, default: `'ACTIVE'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(email)'
+}
+
+// user_user_profiles — Dados do perfil do usuário
+Table user_user_profiles {
+    user_id uuid  [pk]
+    full_name varchar(255) 
+    birth_date date 
+    marketing_opt_in boolean  [not null, default: `false`]
+    preferred_language varchar(10)  [not null, default: `'PT-BR'`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_addresses — Endereços do usuário
+Table user_user_addresses {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    label varchar(64) 
+    zip_code varchar(16) 
+    street varchar(255) 
+    number varchar(16) 
+    complement varchar(255) 
+    neighborhood varchar(128) 
+    city varchar(128) 
+    state varchar(64) 
+    country varchar(64)  [not null, default: `'BRASIL'`]
+    latitude decimal(10,7) 
+    longitude decimal(10,7) 
+    is_default boolean  [not null, default: `false`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_consents — Registro de consentimento LGPD
+Table user_user_consents {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    consent_type varchar(64)  [not null]
+    version varchar(16)  [not null]
+    accepted_at timestamp  [not null, default: `NOW()`]
+    source varchar(64) 
+}
+
+// user_refresh_tokens — Tokens de refresh rotativos
+Table user_refresh_tokens {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    token_hash varchar(255)  [not null]
+    device_id varchar(128) 
+    expires_at timestamp  [not null]
+    revoked_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// user_user_devices — Dispositivos do usuário
+Table user_user_devices {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    device_id varchar(255)  [not null]
+    platform varchar(32) 
+    push_token varchar(512) 
+    last_seen_at timestamp 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(device_id)'
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: user_refresh_tokens.user_id > auth_users.id
+Ref: user_user_addresses.user_id > auth_users.id
+Ref: user_user_consents.user_id > auth_users.id
+Ref: user_user_devices.user_id > auth_users.id
+Ref: user_user_profiles.user_id > auth_users.id
+
+// ── Referenced by Other Domains ──
+
+// ← [02] onboarding-admin: Onboarding Admin
+// Ref: onboarding_courier_profiles.user_id > auth_users.id
+// Ref: onboarding_moderation_audit_log.reviewer_id > auth_users.id
+// Ref: onboarding_onboarding_applications.reviewer_id > auth_users.id
+// Ref: onboarding_onboarding_applications.user_id > auth_users.id
+// Ref: onboarding_restaurant_profiles.address_id > user_user_addresses.id
+// Ref: onboarding_restaurant_profiles.owner_user_id > auth_users.id
+
+// ← [06] carrinho-pedido: Carrinho e Pedido
+// Ref: order_orders.user_id > auth_users.id
+
+// ← [07] pagamentos: Pagamentos
+// Ref: payment_payment_tokens.user_id > auth_users.id
+// Ref: payment_refunds.created_by > auth_users.id
+
+// ← [08] estados-pedido-restaurante: Estados do Pedido
+// Ref: order_order_status_history.changed_by > auth_users.id
+
+// ← [09] matching-entregador: Matching Entregador
+// Ref: dispatch_courier_availability_history.courier_id > auth_users.id
+// Ref: dispatch_courier_sessions.courier_id > auth_users.id
+// Ref: dispatch_delivery_assignments.courier_id > auth_users.id
+// Ref: dispatch_delivery_offers.courier_id > auth_users.id
+// Ref: dispatch_escalation_queue.resolved_by > auth_users.id
+
+// ← [10] roteirizacao-localizacao: Roteirizacao e Localizacao
+// Ref: tracking_courier_daily_tracks.courier_id > auth_users.id
+// Ref: tracking_delivery_milestones.courier_id > auth_users.id
+// Ref: tracking_delivery_tracking.courier_id > auth_users.id
+// Ref: tracking_location_pings.courier_id > auth_users.id
+
+// ← [11] rastreamento-tempo-real: Rastreamento Tempo Real
+// Ref: realtime_tracking_sessions.user_id > auth_users.id
+
+// ← [12] confirmacao-entrega: Confirmacao de Entrega
+// Ref: verification_delivery_disputes.resolved_by > auth_users.id
+// Ref: verification_delivery_verification_attempts.courier_id > auth_users.id
+// Ref: verification_delivery_verification_codes.confirmed_by_admin_id > auth_users.id
+// Ref: verification_delivery_verification_codes.confirmed_by_courier_id > auth_users.id
+
+// ← [13] avaliacoes: Avaliacoes
+// Ref: rating_order_ratings.user_id > auth_users.id
+
+// ← [15] cupons-campanhas: Cupons e Campanhas
+// Ref: promotion_campaigns.created_by > auth_users.id
+// Ref: promotion_coupon_redemptions.user_id > auth_users.id
+// Ref: promotion_coupons.created_by > auth_users.id

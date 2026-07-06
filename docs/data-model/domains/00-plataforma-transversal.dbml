@@ -1,0 +1,44 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 00: Plataforma Transversal
+// Arquivo: 00-plataforma-transversal.dbml
+// Schema(s): infra
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table infra_service_registry {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    service_name varchar(64)  [not null]
+    base_url varchar(256)  [not null]
+    health_endpoint varchar(128)  [not null, default: `'/HEALTH'`]
+    health_status varchar(16)  [not null, default: `'HEALTHY'`]
+    last_health_check timestamp 
+    schema_version varchar(16) 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(service_name)'
+}
+
+Table infra_rate_limit_rules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    route_pattern varchar(256)  [not null]
+    limit_per_second integer  [not null]
+    limit_per_minute integer  [not null]
+    limit_per_hour integer  [not null]
+    scope varchar(32)  [not null]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table infra_dead_letter_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    event_id uuid  [not null]
+    event_type varchar(64)  [not null]
+    source_service varchar(64)  [not null]
+    error_message text 
+    error_code varchar(32) 
+    retry_count integer  [not null, default: `0`]
+    payload jsonb 
+    failed_at timestamp  [not null, default: `NOW()`]
+    reprocessed_at timestamp 
+    status varchar(16)  [not null, default: `'PENDING'`]
+}

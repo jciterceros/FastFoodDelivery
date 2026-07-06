@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FastFoodDelivery — ER Diagram Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.css">
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --surface: #ffffff;
+    --surface-hover: #f0f1f3;
+    --border: #dee2e6;
+    --text: #212529;
+    --text-secondary: #6c757d;
+    --accent: #4361ee;
+    --accent-light: #eef0ff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --radius: 8px;
+    --sidebar-width: 280px;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #1a1d2e;
+    --surface-hover: #252840;
+    --border: #2d3154;
+    --text: #e4e6f0;
+    --text-secondary: #8b8fa3;
+    --accent: #6c8cff;
+    --accent-light: #1e2240;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-width);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-header h1 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  .sidebar-header .meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .search-box {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-box input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    transition: border 0.15s;
+  }
+
+  .search-box input:focus {
+    border-color: var(--accent);
+  }
+
+  .table-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .table-list::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .table-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+
+  .schema-group {
+    margin-bottom: 8px;
+  }
+
+  .schema-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 6px 8px 4px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .schema-label::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  .schema-label[data-schema="infra"]::before { background: #6c757d; }
+  .schema-label[data-schema="auth"]::before { background: #e63946; }
+  .schema-label[data-schema="user"]::before { background: #e63946; }
+  .schema-label[data-schema="onboarding"]::before { background: #f77f00; }
+  .schema-label[data-schema="menu"]::before { background: #e9c46a; }
+  .schema-label[data-schema="coverage"]::before { background: #2a9d8f; }
+  .schema-label[data-schema="search"]::before { background: #264653; }
+  .schema-label[data-schema="order"]::before { background: #457b9d; }
+  .schema-label[data-schema="payment"]::before { background: #1d3557; }
+  .schema-label[data-schema="dispatch"]::before { background: #a8dadc; }
+  .schema-label[data-schema="tracking"]::before { background: #9b5de5; }
+  .schema-label[data-schema="realtime"]::before { background: #f15bb5; }
+  .schema-label[data-schema="verification"]::before { background: #fee440; }
+  .schema-label[data-schema="rating"]::before { background: #00bbf9; }
+  .schema-label[data-schema="finance"]::before { background: #00f5d4; }
+  .schema-label[data-schema="promotion"]::before { background: #ff006e; }
+
+  .table-item {
+    display: block;
+    padding: 4px 8px 4px 20px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+    text-decoration: none;
+  }
+
+  .table-item:hover { background: var(--surface-hover); }
+  .table-item.highlight { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+
+  .sidebar-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sidebar-footer .stat {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .theme-toggle:hover { background: var(--surface-hover); }
+
+  /* ── Main canvas ── */
+  .canvas-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  #mermaid-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    cursor: grab;
+    padding: 40px;
+  }
+
+  #mermaid-container:active { cursor: grabbing; }
+
+  #mermaid-container svg {
+    max-width: none;
+    max-height: none;
+  }
+
+  .canvas-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px;
+    box-shadow: var(--shadow);
+  }
+
+  .canvas-controls button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+  }
+
+  .canvas-controls button:hover { background: var(--surface-hover); }
+
+  .zoom-level {
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    min-width: 40px;
+    justify-content: center;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .empty-state h3 { font-size: 16px; margin-bottom: 4px; }
+  .empty-state p { font-size: 12px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+
+  .modal h2 { font-size: 16px; margin-bottom: 16px; }
+
+  .modal-close {
+    float: right;
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .modal table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .modal th {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .modal td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px;
+  }
+
+  .modal td .badge-pk {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+
+  .modal td .badge-fk {
+    display: inline-block;
+    background: #fff3cd;
+    color: #856404;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+
+  .modal td .badge-nn {
+    display: inline-block;
+    background: #e2e3e5;
+    color: #383d41;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .modal .comment {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 6px;
+    font-style: italic;
+  }
+
+  .fk-section {
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  .fk-heading {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+
+  .fk-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px 0;
+  }
+
+  .fk-list li {
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .fk-list li:last-child {
+    border-bottom: none;
+  }
+
+  .fk-list code {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px;
+    background: var(--bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .domain-badge {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h1>FastFoodDelivery</h1>
+    <div class="meta">ER Diagram · 64 tabelas · 16 schemas</div>
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Buscar tabela..." autocomplete="off">
+  </div>
+  <div class="table-list" id="tableList"></div>
+  <div class="sidebar-footer">
+    <span class="stat"><span id="visibleCount">64</span>/64 tabelas</span>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">🌙</button>
+  </div>
+</div>
+
+<div class="canvas-wrapper" id="canvasWrapper">
+  <div id="mermaid-container">
+    <pre class="mermaid" id="mermaidPre">
+    </pre>
+  </div>
+  <div class="empty-state" id="emptyState" style="display:none">
+    <h3>Nenhuma tabela encontrada</h3>
+    <p>Tente alterar o termo de busca</p>
+  </div>
+  <div class="canvas-controls">
+    <button onclick="zoomIn()" title="Aumentar zoom">+</button>
+    <span class="zoom-level" id="zoomLevel">100%</span>
+    <button onclick="zoomOut()" title="Diminuir zoom">−</button>
+    <button onclick="resetZoom()" title="Resetar zoom">⟲</button>
+    <button onclick="fitToScreen()" title="Ajustar à tela">⊞</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 id="modalTitle">Table</h2>
+    <table>
+      <thead><tr><th>Coluna</th><th>Tipo</th><th>Atributos</th></tr></thead>
+      <tbody id="modalBody"></tbody>
+    </table>
+    <div id="modalComment" class="comment"></div>
+    <div id="modalRelationships"></div>
+  </div>
+</div>
+
+<script>
+// ── ER Diagram data ──
+const ER_DIAGRAM = `
+erDiagram
+
+  infra_service_registry {
+    uuid id PK
+    varchar service_name "not null"
+    varchar base_url "not null"
+    varchar health_endpoint "not null"
+    varchar health_status "not null"
+    timestamp last_health_check
+    varchar schema_version
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  infra_rate_limit_rules {
+    uuid id PK
+    varchar route_pattern "not null"
+    integer limit_per_second "not null"
+    integer limit_per_minute "not null"
+    integer limit_per_hour "not null"
+    varchar scope "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  infra_dead_letter_log {
+    uuid id PK
+    uuid event_id "not null"
+    varchar event_type "not null"
+    varchar source_service "not null"
+    text error_message
+    varchar error_code
+    integer retry_count "not null"
+    jsonb payload
+    timestamp failed_at "not null"
+    timestamp reprocessed_at
+    varchar status "not null"
+  }
+
+  auth_users {
+    uuid id PK
+    varchar email "not null"
+    timestamp email_verified_at
+    varchar phone
+    timestamp phone_verified_at
+    varchar password_hash "not null"
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_profiles {
+    uuid user_id PK
+    varchar full_name
+    date birth_date
+    boolean marketing_opt_in "not null"
+    varchar preferred_language "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_addresses {
+    uuid id PK
+    uuid user_id "not null"
+    varchar label
+    varchar zip_code
+    varchar street
+    varchar number
+    varchar complement
+    varchar neighborhood
+    varchar city
+    varchar state
+    varchar country "not null"
+    decimal latitude
+    decimal longitude
+    boolean is_default "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  user_user_consents {
+    uuid id PK
+    uuid user_id "not null"
+    varchar consent_type "not null"
+    varchar version "not null"
+    timestamp accepted_at "not null"
+    varchar source
+  }
+
+  user_refresh_tokens {
+    uuid id PK
+    uuid user_id "not null"
+    varchar token_hash "not null"
+    varchar device_id
+    timestamp expires_at "not null"
+    timestamp revoked_at
+    timestamp created_at "not null"
+  }
+
+  user_user_devices {
+    uuid id PK
+    uuid user_id "not null"
+    varchar device_id "not null"
+    varchar platform
+    varchar push_token
+    timestamp last_seen_at
+    timestamp created_at "not null"
+  }
+
+  onboarding_onboarding_applications {
+    uuid id PK
+    uuid user_id "not null"
+    varchar type "not null"
+    varchar status "not null"
+    timestamp submitted_at
+    timestamp reviewed_at
+    uuid reviewer_id
+    varchar rejection_reason
+    text rejection_note
+    uuid resubmitted_from
+    jsonb metadata
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_application_documents {
+    uuid id PK
+    uuid application_id "not null"
+    varchar doc_type "not null"
+    varchar storage_key "not null"
+    varchar original_filename
+    varchar mime_type
+    integer file_size_bytes
+    varchar checksum
+    timestamp uploaded_at "not null"
+  }
+
+  onboarding_restaurant_profiles {
+    uuid id PK
+    uuid application_id "not null"
+    uuid owner_user_id "not null"
+    varchar legal_name "not null"
+    varchar trading_name
+    varchar cnpj "not null"
+    varchar cpf_responsavel
+    uuid address_id
+    varchar phone
+    jsonb operating_hours_json
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_courier_profiles {
+    uuid id PK
+    uuid application_id "not null"
+    uuid user_id "not null"
+    varchar vehicle_type
+    varchar license_number "not null"
+    date license_expiry
+    varchar license_category
+    varchar vehicle_plate
+    integer vehicle_year
+    varchar vehicle_color
+    varchar status "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  onboarding_moderation_audit_log {
+    uuid id PK
+    uuid application_id "not null"
+    varchar action "not null"
+    varchar from_status
+    varchar to_status
+    uuid reviewer_id
+    text comment
+    timestamp created_at "not null"
+  }
+
+  menu_menu_categories {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar name "not null"
+    varchar description
+    integer sort_order "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_items {
+    uuid id PK
+    uuid category_id "not null"
+    varchar name "not null"
+    text description
+    integer price_cents "not null"
+    varchar image_url
+    boolean is_available "not null"
+    integer preparation_time_seconds
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_modifiers {
+    uuid id PK
+    uuid item_id "not null"
+    varchar name "not null"
+    integer min_selections "not null"
+    integer max_selections "not null"
+    boolean is_required "not null"
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_menu_modifier_options {
+    uuid id PK
+    uuid modifier_id "not null"
+    varchar name "not null"
+    integer price_delta_cents "not null"
+    boolean is_default "not null"
+    boolean is_available "not null"
+    integer sort_order "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  menu_restaurant_schedules {
+    uuid id PK
+    uuid restaurant_id "not null"
+    smallint day_of_week "not null"
+    time open_time "not null"
+    time close_time "not null"
+    boolean is_closed "not null"
+  }
+
+  menu_menu_snapshots {
+    uuid id PK
+    uuid restaurant_id "not null"
+    integer version "not null"
+    jsonb snapshot "not null"
+    timestamp published_at
+    timestamp created_at "not null"
+  }
+
+  coverage_delivery_zones {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar zone_type "not null"
+    geometry geometry "not null"
+    decimal radius_km
+    integer base_fee_cents "not null"
+    integer additional_fee_per_km_cents "not null"
+    integer min_order_cents "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  coverage_platform_regions {
+    uuid id PK
+    varchar name "not null"
+    geometry geometry "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+  }
+
+  coverage_coverage_cache {
+    varchar geohash PK
+    uuid[] restaurant_ids "not null"
+    uuid platform_region_id
+    integer base_fee_cents "not null"
+    timestamp cached_at "not null"
+    timestamp expires_at "not null"
+  }
+
+  coverage_address_geocoding_cache {
+    uuid id PK
+    varchar address_hash "not null"
+    decimal latitude "not null"
+    decimal longitude "not null"
+    varchar formatted_address
+    varchar place_id
+    varchar provider "not null"
+    timestamp cached_at "not null"
+    timestamp expires_at "not null"
+  }
+
+  coverage_delivery_fee_tiers {
+    uuid id PK
+    uuid restaurant_id "not null"
+    uuid zone_id "not null"
+    decimal min_distance_km "not null"
+    decimal max_distance_km
+    integer fee_cents "not null"
+    timestamp created_at "not null"
+  }
+
+  search_restaurant_search_fallback {
+    uuid restaurant_id PK
+    varchar name "not null"
+    text description
+    varchar cuisine_type
+    decimal avg_rating
+    integer review_count "not null"
+    integer delivery_fee_cents "not null"
+    boolean is_open "not null"
+    integer last_menu_version "not null"
+    geography location
+    tsvector full_text
+  }
+
+  order_orders {
+    uuid id PK
+    uuid user_id "not null"
+    uuid restaurant_id "not null"
+    varchar status "not null"
+    integer subtotal_cents "not null"
+    integer delivery_fee_cents "not null"
+    integer discount_cents "not null"
+    integer total_cents "not null"
+    varchar promotion_code
+    decimal delivery_latitude
+    decimal delivery_longitude
+    jsonb delivery_address_snapshot
+    integer estimated_minutes
+    varchar idempotency_key "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  order_order_items {
+    uuid id PK
+    uuid order_id "not null"
+    uuid item_id "not null"
+    varchar name "not null"
+    integer quantity "not null"
+    integer unit_price_cents "not null"
+    jsonb modifiers_snapshot
+    integer total_price_cents "not null"
+    varchar notes
+  }
+
+  order_inventory_reservations {
+    uuid id PK
+    uuid item_id "not null"
+    uuid order_id "not null"
+    integer quantity "not null"
+    varchar status "not null"
+    timestamp expires_at "not null"
+    timestamp created_at "not null"
+  }
+
+  payment_payments {
+    uuid id PK
+    uuid order_id "not null"
+    varchar method "not null"
+    integer amount_cents "not null"
+    varchar status "not null"
+    varchar gateway "not null"
+    varchar gateway_payment_id
+    jsonb gateway_response
+    text pix_qr_code
+    varchar pix_qr_text
+    timestamp pix_expires_at
+    integer refunded_cents "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  payment_payment_tokens {
+    uuid id PK
+    uuid user_id "not null"
+    varchar gateway "not null"
+    varchar gateway_token "not null"
+    varchar brand
+    varchar last4
+    varchar cardholder_name
+    smallint exp_month
+    smallint exp_year
+    boolean is_default "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+  }
+
+  payment_payment_webhooks {
+    uuid id PK
+    varchar idempotency_key "not null"
+    varchar gateway "not null"
+    varchar event_type "not null"
+    varchar payload_hash "not null"
+    jsonb raw_payload "not null"
+    timestamp processed_at
+  }
+
+  payment_refunds {
+    uuid id PK
+    uuid payment_id "not null"
+    integer amount_cents "not null"
+    varchar reason
+    varchar gateway_refund_id
+    uuid created_by "not null"
+    timestamp created_at "not null"
+  }
+
+  order_order_sla_config {
+    uuid id PK
+    uuid restaurant_id "not null"
+    integer preparation_timeout_minutes "not null"
+    integer pickup_timeout_minutes "not null"
+    integer auto_cancel_after_minutes "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  order_order_status_history {
+    uuid id PK
+    uuid order_id "not null"
+    varchar from_status
+    varchar to_status "not null"
+    uuid changed_by
+    varchar changed_by_role
+    varchar reason
+    integer elapsed_seconds
+    timestamp created_at "not null"
+  }
+
+  dispatch_delivery_offers {
+    uuid id PK
+    uuid order_id "not null"
+    uuid courier_id "not null"
+    smallint attempt "not null"
+    varchar status "not null"
+    timestamp expires_at "not null"
+    timestamp responded_at
+    varchar rejection_reason
+    timestamp created_at "not null"
+  }
+
+  dispatch_delivery_assignments {
+    uuid id PK
+    uuid order_id "not null"
+    uuid courier_id "not null"
+    uuid offer_id
+    varchar status "not null"
+    timestamp assigned_at "not null"
+    timestamp picked_up_at
+    timestamp completed_at
+    timestamp cancelled_at
+    varchar cancellation_reason
+  }
+
+  dispatch_courier_sessions {
+    uuid id PK
+    uuid courier_id "not null"
+    boolean is_online "not null"
+    varchar current_geohash
+    decimal last_lat
+    decimal last_lon
+    varchar status "not null"
+    uuid current_delivery_id
+    smallint battery_level
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  dispatch_escalation_queue {
+    uuid id PK
+    uuid order_id "not null"
+    smallint attempts "not null"
+    timestamp last_attempt_at
+    timestamp escalated_at "not null"
+    varchar status "not null"
+    uuid resolved_by
+    timestamp resolved_at
+    text notes
+  }
+
+  dispatch_courier_availability_history {
+    uuid id PK
+    uuid courier_id "not null"
+    varchar previous_status
+    varchar new_status "not null"
+    varchar reason
+    varchar geohash
+    timestamp created_at "not null"
+  }
+
+  tracking_delivery_tracking {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    uuid order_id "not null"
+    varchar current_milestone "not null"
+    decimal last_lat
+    decimal last_lon
+    varchar last_geohash
+    timestamp started_at
+    timestamp picked_up_at
+    timestamp arrived_at
+    timestamp completed_at
+    timestamp estimated_eta
+    timestamp updated_at "not null"
+  }
+
+  tracking_location_pings {
+    uuid id
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    decimal lat "not null"
+    decimal lon "not null"
+    smallint accuracy
+    varchar geohash
+    smallint battery_level
+    timestamp recorded_at "not null"
+    timestamp ingested_at "not null"
+    varchar source "not null"
+  }
+
+  tracking_delivery_milestones {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    varchar milestone "not null"
+    decimal lat
+    decimal lon
+    varchar geohash
+    varchar source "not null"
+    timestamp created_at "not null"
+  }
+
+  tracking_delivery_routes {
+    uuid id PK
+    uuid delivery_id "not null"
+    varchar pickup_address
+    decimal pickup_lat
+    decimal pickup_lon
+    varchar dropoff_address
+    decimal dropoff_lat
+    decimal dropoff_lon
+    text polyline_encoded
+    decimal distance_km
+    integer estimated_duration_minutes
+    timestamp cached_at "not null"
+    timestamp expires_at
+  }
+
+  tracking_courier_daily_tracks {
+    uuid id PK
+    uuid courier_id "not null"
+    date date "not null"
+    integer total_deliveries "not null"
+    decimal total_distance_km "not null"
+    integer total_active_minutes "not null"
+    text[] geohashes_visited
+    timestamp created_at "not null"
+  }
+
+  realtime_tracking_sessions {
+    uuid id PK
+    uuid order_id "not null"
+    uuid user_id "not null"
+    varchar device_id
+    varchar session_token "not null"
+    varchar status "not null"
+    timestamp connected_at "not null"
+    timestamp disconnected_at
+    timestamp last_activity_at
+    integer messages_sent "not null"
+    varchar ip_address
+    varchar user_agent
+  }
+
+  realtime_tracking_snapshots {
+    uuid id PK
+    uuid order_id "not null"
+    decimal courier_lat
+    decimal courier_lon
+    varchar courier_geohash
+    varchar milestone
+    timestamp milestone_changed_at
+    timestamp estimated_eta
+    decimal pickup_lat
+    decimal pickup_lon
+    decimal dropoff_lat
+    decimal dropoff_lon
+    text polyline_encoded
+    integer version "not null"
+    timestamp updated_at "not null"
+  }
+
+  verification_delivery_verification_codes {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid order_id "not null"
+    varchar code_hash "not null"
+    varchar code_prefix
+    varchar status "not null"
+    timestamp generated_at "not null"
+    timestamp expires_at "not null"
+    timestamp confirmed_at
+    uuid confirmed_by_courier_id
+    uuid confirmed_by_admin_id
+    timestamp revoked_at
+    varchar revocation_reason
+  }
+
+  verification_delivery_verification_attempts {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid courier_id "not null"
+    varchar code_submitted "not null"
+    varchar code_submitted_prefix
+    varchar result "not null"
+    decimal courier_lat
+    decimal courier_lon
+    varchar geohash
+    varchar ip_address
+    timestamp created_at "not null"
+  }
+
+  verification_delivery_disputes {
+    uuid id PK
+    uuid delivery_id "not null"
+    uuid order_id "not null"
+    varchar opened_by "not null"
+    varchar reason "not null"
+    varchar status "not null"
+    varchar resolution
+    uuid resolved_by
+    timestamp resolved_at
+    jsonb evidence
+    timestamp created_at "not null"
+  }
+
+  rating_order_ratings {
+    uuid id PK
+    uuid order_id "not null"
+    uuid user_id "not null"
+    varchar target_type "not null"
+    uuid target_id "not null"
+    smallint score "not null"
+    varchar comment
+    varchar comment_status "not null"
+    jsonb moderation_result
+    boolean is_edited "not null"
+    timestamp edited_at
+    timestamp created_at "not null"
+  }
+
+  rating_rating_aggregates {
+    uuid id PK
+    varchar target_type "not null"
+    uuid target_id "not null"
+    decimal avg_score "not null"
+    integer total_ratings "not null"
+    jsonb distribution
+    timestamp last_rating_at
+    timestamp updated_at "not null"
+  }
+
+  rating_moderation_blocklist {
+    uuid id PK
+    varchar word "not null"
+    varchar category
+    boolean is_regex "not null"
+    varchar severity "not null"
+    timestamp created_at "not null"
+  }
+
+  finance_bank_accounts {
+    uuid id PK
+    uuid restaurant_id "not null"
+    varchar bank_code "not null"
+    varchar agency "not null"
+    varchar account "not null"
+    varchar account_digit "not null"
+    varchar account_type
+    varchar pix_key
+    varchar holder_name "not null"
+    varchar holder_document "not null"
+    varchar holder_type "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  finance_payout_config {
+    uuid id PK
+    uuid restaurant_id "not null"
+    smallint cycle_days "not null"
+    date next_payout_date "not null"
+    integer min_payout_cents "not null"
+    boolean auto_payout "not null"
+    uuid default_bank_account_id
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  finance_payouts {
+    uuid id PK
+    uuid restaurant_id "not null"
+    date period_start "not null"
+    date period_end "not null"
+    integer gross_cents "not null"
+    integer fees_cents "not null"
+    integer net_cents "not null"
+    varchar status "not null"
+    varchar payment_method
+    uuid bank_account_id
+    varchar transfer_id
+    timestamp transferred_at
+    varchar failure_reason
+    timestamp created_at "not null"
+  }
+
+  finance_daily_restaurant_rollups {
+    uuid id PK
+    uuid restaurant_id "not null"
+    date date "not null"
+    integer gross_cents "not null"
+    integer platform_fees_cents "not null"
+    integer delivery_fees_cents "not null"
+    integer net_cents "not null"
+    integer refunds_cents "not null"
+    integer adjustments_cents "not null"
+    integer order_count "not null"
+    varchar payout_status
+    uuid payout_id
+    timestamp updated_at "not null"
+  }
+
+  finance_ledger_entries {
+    uuid id
+    uuid restaurant_id "not null"
+    uuid order_id
+    varchar entry_type "not null"
+    integer amount_cents "not null"
+    varchar description
+    uuid reference_id
+    varchar reference_type
+    varchar status "not null"
+    timestamp settled_at
+    timestamp created_at "not null"
+  }
+
+  finance_reconciliation_log {
+    uuid id PK
+    date date "not null"
+    integer total_ledger_cents "not null"
+    integer total_gateway_cents "not null"
+    integer difference_cents "not null"
+    varchar status "not null"
+    jsonb details
+    timestamp created_at "not null"
+  }
+
+  promotion_campaigns {
+    uuid id PK
+    varchar name "not null"
+    text description
+    varchar type "not null"
+    integer budget_cents "not null"
+    integer budget_spent_cents "not null"
+    timestamp starts_at "not null"
+    timestamp ends_at "not null"
+    varchar status "not null"
+    varchar target_metric
+    decimal roi_goal_percent
+    uuid created_by
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_coupons {
+    uuid id PK
+    varchar code "not null"
+    uuid campaign_id "not null"
+    varchar type "not null"
+    integer value_cents
+    decimal value_percent
+    integer max_discount_cents
+    integer min_order_cents "not null"
+    integer max_redemptions
+    integer max_per_user "not null"
+    timestamp starts_at "not null"
+    timestamp ends_at "not null"
+    varchar restaurant_scope
+    uuid[] restaurant_ids
+    varchar region_scope
+    varchar region_geohashes
+    boolean first_purchase_only "not null"
+    varchar subsidy_type
+    decimal subsidy_platform_percent
+    boolean is_active "not null"
+    uuid created_by
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_coupon_redemptions {
+    uuid id PK
+    uuid coupon_id "not null"
+    uuid user_id "not null"
+    uuid order_id "not null"
+    integer discount_cents "not null"
+    integer original_total_cents "not null"
+    integer final_total_cents "not null"
+    jsonb rules_snapshot
+    integer subsidy_platform_cents "not null"
+    integer subsidy_restaurant_cents "not null"
+    timestamp created_at "not null"
+  }
+
+  promotion_delivery_fee_rules {
+    uuid id PK
+    uuid zone_id "not null"
+    jsonb region_geometry
+    integer fee_cents "not null"
+    integer min_order_cents "not null"
+    integer free_delivery_above_cents
+    timestamp valid_from "not null"
+    timestamp valid_to
+    integer priority "not null"
+    boolean is_active "not null"
+    timestamp created_at "not null"
+    timestamp updated_at "not null"
+  }
+
+  promotion_campaign_daily_stats {
+    uuid id PK
+    uuid campaign_id "not null"
+    date date "not null"
+    integer redemptions "not null"
+    integer discount_cents "not null"
+    integer gross_order_cents "not null"
+    integer new_users "not null"
+    timestamp created_at "not null"
+  }
+
+  %% Relationships
+
+  auth_users ||--|| user_user_profiles : "references"
+  auth_users ||--o{ user_user_addresses : "references"
+  auth_users ||--o{ user_user_consents : "references"
+  auth_users ||--o{ user_refresh_tokens : "references"
+  auth_users ||--o{ user_user_devices : "references"
+  auth_users ||--o{ onboarding_onboarding_applications : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_onboarding_applications : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_application_documents : "references"
+  onboarding_onboarding_applications ||--|| onboarding_restaurant_profiles : "references"
+  auth_users ||--o{ onboarding_restaurant_profiles : "references"
+  user_user_addresses ||--o{ onboarding_restaurant_profiles : "references"
+  onboarding_onboarding_applications ||--|| onboarding_courier_profiles : "references"
+  auth_users ||--o{ onboarding_courier_profiles : "references"
+  onboarding_onboarding_applications ||--o{ onboarding_moderation_audit_log : "references"
+  auth_users ||--o{ onboarding_moderation_audit_log : "references"
+  onboarding_restaurant_profiles ||--o{ menu_menu_categories : "references"
+  menu_menu_categories ||--o{ menu_menu_items : "references"
+  menu_menu_items ||--o{ menu_menu_modifiers : "references"
+  menu_menu_modifiers ||--o{ menu_menu_modifier_options : "references"
+  onboarding_restaurant_profiles ||--o{ menu_restaurant_schedules : "references"
+  onboarding_restaurant_profiles ||--o{ menu_menu_snapshots : "references"
+  onboarding_restaurant_profiles ||--o{ coverage_delivery_zones : "references"
+  coverage_platform_regions ||--o{ coverage_coverage_cache : "references"
+  onboarding_restaurant_profiles ||--o{ coverage_delivery_fee_tiers : "references"
+  coverage_delivery_zones ||--o{ coverage_delivery_fee_tiers : "references"
+  onboarding_restaurant_profiles ||--|| search_restaurant_search_fallback : "references"
+  auth_users ||--o{ order_orders : "references"
+  onboarding_restaurant_profiles ||--o{ order_orders : "references"
+  order_orders ||--o{ order_order_items : "references"
+  menu_menu_items ||--o{ order_order_items : "references"
+  menu_menu_items ||--o{ order_inventory_reservations : "references"
+  order_orders ||--o{ order_inventory_reservations : "references"
+  order_orders ||--o{ payment_payments : "references"
+  auth_users ||--o{ payment_payment_tokens : "references"
+  payment_payments ||--o{ payment_refunds : "references"
+  auth_users ||--o{ payment_refunds : "references"
+  onboarding_restaurant_profiles ||--|| order_order_sla_config : "references"
+  order_orders ||--o{ order_order_status_history : "references"
+  auth_users ||--o{ order_order_status_history : "references"
+  order_orders ||--o{ dispatch_delivery_offers : "references"
+  auth_users ||--o{ dispatch_delivery_offers : "references"
+  order_orders ||--|| dispatch_delivery_assignments : "references"
+  auth_users ||--o{ dispatch_delivery_assignments : "references"
+  dispatch_delivery_offers ||--o{ dispatch_delivery_assignments : "references"
+  auth_users ||--|| dispatch_courier_sessions : "references"
+  dispatch_delivery_assignments ||--o{ dispatch_courier_sessions : "references"
+  order_orders ||--|| dispatch_escalation_queue : "references"
+  auth_users ||--o{ dispatch_escalation_queue : "references"
+  auth_users ||--o{ dispatch_courier_availability_history : "references"
+  dispatch_delivery_assignments ||--|| tracking_delivery_tracking : "references"
+  auth_users ||--o{ tracking_delivery_tracking : "references"
+  order_orders ||--o{ tracking_delivery_tracking : "references"
+  dispatch_delivery_assignments ||--o{ tracking_location_pings : "references"
+  auth_users ||--o{ tracking_location_pings : "references"
+  dispatch_delivery_assignments ||--o{ tracking_delivery_milestones : "references"
+  auth_users ||--o{ tracking_delivery_milestones : "references"
+  dispatch_delivery_assignments ||--|| tracking_delivery_routes : "references"
+  auth_users ||--o{ tracking_courier_daily_tracks : "references"
+  order_orders ||--o{ realtime_tracking_sessions : "references"
+  auth_users ||--o{ realtime_tracking_sessions : "references"
+  order_orders ||--|| realtime_tracking_snapshots : "references"
+  dispatch_delivery_assignments ||--|| verification_delivery_verification_codes : "references"
+  order_orders ||--o{ verification_delivery_verification_codes : "references"
+  auth_users ||--o{ verification_delivery_verification_codes : "references"
+  dispatch_delivery_assignments ||--o{ verification_delivery_verification_attempts : "references"
+  auth_users ||--o{ verification_delivery_verification_attempts : "references"
+  dispatch_delivery_assignments ||--|| verification_delivery_disputes : "references"
+  order_orders ||--o{ verification_delivery_disputes : "references"
+  auth_users ||--o{ verification_delivery_disputes : "references"
+  order_orders ||--o{ rating_order_ratings : "references"
+  auth_users ||--o{ rating_order_ratings : "references"
+  onboarding_restaurant_profiles ||--|| finance_bank_accounts : "references"
+  onboarding_restaurant_profiles ||--|| finance_payout_config : "references"
+  finance_bank_accounts ||--o{ finance_payout_config : "references"
+  onboarding_restaurant_profiles ||--o{ finance_payouts : "references"
+  finance_bank_accounts ||--o{ finance_payouts : "references"
+  onboarding_restaurant_profiles ||--o{ finance_daily_restaurant_rollups : "references"
+  finance_payouts ||--o{ finance_daily_restaurant_rollups : "references"
+  onboarding_restaurant_profiles ||--o{ finance_ledger_entries : "references"
+  order_orders ||--o{ finance_ledger_entries : "references"
+  auth_users ||--o{ promotion_campaigns : "references"
+  promotion_campaigns ||--o{ promotion_coupons : "references"
+  auth_users ||--o{ promotion_coupons : "references"
+  promotion_coupons ||--o{ promotion_coupon_redemptions : "references"
+  auth_users ||--o{ promotion_coupon_redemptions : "references"
+  order_orders ||--|| promotion_coupon_redemptions : "references"
+  coverage_delivery_zones ||--o{ promotion_delivery_fee_rules : "references"
+  promotion_campaigns ||--o{ promotion_campaign_daily_stats : "references"
+`;
+
+// ── Mermaid config ──
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  themeVariables: {
+    background: '#ffffff',
+    primaryColor: '#4361ee',
+    primaryBorderColor: '#4361ee',
+    primaryTextColor: '#212529',
+    lineColor: '#adb5bd',
+    secondaryColor: '#f8f9fa',
+    tertiaryColor: '#ffffff',
+    fontSize: '12px',
+  },
+  securityLevel: 'loose',
+  er: {
+    diagramPadding: 20,
+    layoutDirection: 'TB',
+    minEntityWidth: 160,
+    minEntityHeight: 60,
+    entityPadding: 12,
+    stroke: '#dee2e6',
+    fill: '#ffffff',
+    fontSize: 12,
+    useMaxWidth: false,
+  },
+});
+
+const THEME_KEY = 'er-viewer-theme';
+let scale = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isDragging = false;
+let dragStartX, dragStartY;
+let tableData = [];
+let activeTableName = null;
+
+// ── Parse the Mermaid ER diagram for table list ──
+function parseTables(diagram) {
+  const tables = [];
+  const lines = diagram.split('\n');
+  let currentTable = null;
+
+  for (const line of lines) {
+    const tableMatch = line.match(/^\s+(\w+)\s+\{$/);
+    if (tableMatch) {
+      currentTable = { fullName: tableMatch[1], columns: [], comment: '' };
+      // Split schema_table into schema and table
+      const parts = currentTable.fullName.split('_');
+      currentTable.schema = parts[0];
+      currentTable.name = parts.slice(1).join('_');
+      continue;
+    }
+    if (line.match(/^\s+\}$/) && currentTable) {
+      tables.push(currentTable);
+      currentTable = null;
+      continue;
+    }
+    const colMatch = line.match(/^\s+(\w+)\s+(\w+)\s+(.*)$/);
+    if (colMatch && currentTable) {
+      currentTable.columns.push({
+        type: colMatch[1],
+        name: colMatch[2],
+        attrs: colMatch[3].trim(),
+      });
+    }
+  }
+  return tables;
+}
+
+// ── Parse Mermaid relationship lines into parent→child pairs ──
+function parseRelationships(diagram) {
+  const rels = [];
+  const lines = diagram.split('\n');
+  for (const line of lines) {
+    const match = line.match(/^\s+(\w+)\s+\|\|--[o|][{|]\s+(\w+)\s+:/);
+    if (match) {
+      rels.push({ parent: match[1], child: match[2] });
+    }
+  }
+  return rels;
+}
+
+// ── Get domain label from schema prefix ──
+function getDomainLabel(tableName) {
+  const schema = tableName.split('_')[0];
+  const labels = {
+    infra: '00 Plataforma Transversal', auth: '01 Identidade', user: '01 Identidade',
+    onboarding: '02 Onboarding', menu: '03 Cardápio', coverage: '04 Geolocalização',
+    search: '05 Busca', order: '06 Pedido', payment: '07 Pagamentos',
+    dispatch: '09 Matching', tracking: '10 Roteirização', realtime: '11 Tempo Real',
+    verification: '12 Confirmação', rating: '13 Avaliações',
+    finance: '14 Financeiro', promotion: '15 Cupons',
+  };
+  return labels[schema] || schema;
+}
+
+// ── Build FK map (FKs and refs per table) ──
+function buildFKMap(tablesData, relationships) {
+  const map = {};
+  for (const t of tablesData) {
+    map[t.fullName] = { fks: [], refs: [] };
+  }
+  for (const rel of relationships) {
+    const child = tablesData.find(t => t.fullName === rel.child);
+    if (!child) continue;
+    // Find FK column(s) in child: _id columns whose base matches parent
+    const parentKeywords = rel.parent.split('_').slice(1); // remove schema prefix
+    // Match _id columns: check if column base matches parent keyword (handles singular/plural)
+    const matched = child.columns.filter(c => {
+      if (!c.name.endsWith('_id')) return false;
+      const colBase = c.name.slice(0, -3); // remove '_id'
+      return parentKeywords.some(kw =>
+        c.name.includes(kw) || kw.includes(colBase) || colBase.includes(kw)
+      );
+    });
+    if (matched.length > 0) {
+      for (const col of matched) {
+        if (map[rel.child]) {
+          map[rel.child].fks.push({ target: rel.parent, column: col.name, domain: getDomainLabel(rel.parent) });
+        }
+        if (map[rel.parent]) {
+          map[rel.parent].refs.push({ source: rel.child, column: col.name, domain: getDomainLabel(rel.child) });
+        }
+      }
+    } else {
+      // Fallback: add without column name
+      if (map[rel.child]) {
+        map[rel.child].fks.push({ target: rel.parent, column: null, domain: getDomainLabel(rel.parent) });
+      }
+      if (map[rel.parent]) {
+        map[rel.parent].refs.push({ source: rel.child, column: null, domain: getDomainLabel(rel.child) });
+      }
+    }
+  }
+  return map;
+}
+
+// Global relationship data
+let relationshipMap = {};
+
+// ── Build sidebar ──
+function buildSidebar() {
+  tableData = parseTables(ER_DIAGRAM);
+  const list = document.getElementById('tableList');
+  list.innerHTML = '';
+
+  const schemaOrder = ['infra', 'auth', 'user', 'onboarding', 'menu', 'coverage',
+    'search', 'order', 'payment', 'dispatch', 'tracking', 'realtime',
+    'verification', 'rating', 'finance', 'promotion'];
+
+  const schemaLabels = {
+    infra: '00 — PlataformaTransversal', auth: '01 — Identidade', user: '01 — Identidade',
+    onboarding: '02 — Onboarding', menu: '03 — Cardápio', coverage: '04 — Geolocalização',
+    search: '05 — Busca', order: '06 — Pedido', payment: '07 — Pagamentos',
+    dispatch: '09 — Matching', tracking: '10 — Roteirização', realtime: '11 — Tempo Real',
+    verification: '12 — Confirmação', rating: '13 — Avaliações',
+    finance: '14 — Financeiro', promotion: '15 — Cupons',
+  };
+
+  const grouped = {};
+  for (const t of tableData) {
+    if (!grouped[t.schema]) grouped[t.schema] = [];
+    grouped[t.schema].push(t);
+  }
+
+  for (const schema of schemaOrder) {
+    if (!grouped[schema]) continue;
+    const group = document.createElement('div');
+    group.className = 'schema-group';
+
+    const label = document.createElement('div');
+    label.className = 'schema-label';
+    label.dataset.schema = schema;
+    label.textContent = schemaLabels[schema] || schema;
+    group.appendChild(label);
+
+    for (const t of grouped[schema]) {
+      const item = document.createElement('a');
+      item.className = 'table-item';
+      item.href = '#';
+      item.dataset.table = t.fullName;
+      item.textContent = t.name;
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        focusTable(t.fullName);
+      });
+      group.appendChild(item);
+    }
+    list.appendChild(group);
+  }
+  updateCount(tableData.length);
+}
+
+// ── Render diagram ──
+async function renderDiagram(filterTables = []) {
+  const container = document.getElementById('mermaid-container');
+  const pre = document.getElementById('mermaidPre');
+
+  if (filterTables.length > 0) {
+    // Only show selected tables and their relationships
+    const lines = ER_DIAGRAM.split('\n');
+    const filteredLines = [];
+    let inTable = false;
+    let currentTable = '';
+
+    for (const line of lines) {
+      const tableMatch = line.match(/^\s+(\w+)\s+\{$/);
+      if (tableMatch) {
+        currentTable = tableMatch[1];
+        inTable = filterTables.includes(currentTable);
+      }
+      if (line.match(/^\s+\}$/) && currentTable) {
+        if (inTable) filteredLines.push(line);
+        currentTable = '';
+        inTable = false;
+        continue;
+      }
+      if (inTable) filteredLines.push(line);
+    }
+    // Add relationship lines for visible tables
+    filteredLines.push('');
+    filteredLines.push('  %% Relationships');
+    for (const tName of filterTables) {
+      const [, schema] = tName.split('_');
+      // Add standard relationships
+      for (const t of tableData) {
+        if (t.fullName === tName) {
+          for (const col of t.columns) {
+            if (col.attrs.includes('FK') || col.name.includes('_id')) {
+              // Add a generic relationship indicator
+              filteredLines.push(`  ${tName} ||--o{ ${tName} : ""`);
+            }
+          }
+        }
+      }
+    }
+    pre.textContent = filteredLines.join('\n');
+  } else {
+    pre.textContent = ER_DIAGRAM;
+  }
+
+  document.getElementById('emptyState').style.display = filterTables.length === 0 && tableData.length === 0 ? 'block' : 'none';
+
+  try {
+    const { svg } = await mermaid.render('mermaidPre', pre.textContent);
+    container.innerHTML = svg;
+    container.style.display = 'block';
+
+    // Remove the pre element (mermaid replaces it)
+    const newPre = container.querySelector('pre.mermaid');
+    if (newPre) newPre.remove();
+
+    // Add click handlers to entity boxes
+    container.querySelectorAll('.er.entityBox').forEach((box, i) => {
+      box.style.cursor = 'pointer';
+      box.addEventListener('click', () => {
+        const entityLabels = container.querySelectorAll('.er.entityLabel');
+        if (entityLabels[i]) {
+          const tableName = entityLabels[i].textContent.trim();
+          showTableDetails(tableName);
+        }
+      });
+    });
+
+  } catch (e) {
+    console.error('Mermaid render error:', e);
+    container.innerHTML = `<div class="empty-state"><h3>Erro ao renderizar</h3><p>${e.message}</p></div>`;
+  }
+}
+
+// ── Focus on a specific table ──
+async function focusTable(tableName) {
+  // Highlight in sidebar
+  document.querySelectorAll('.table-item').forEach(el => el.classList.remove('highlight'));
+  const item = document.querySelector(`.table-item[data-table="${tableName}"]`);
+  if (item) {
+    item.classList.add('highlight');
+    item.scrollIntoView({ block: 'nearest' });
+  }
+  activeTableName = tableName;
+
+  // Show only this table and its related tables
+  const related = findRelatedTables(tableName);
+  await renderDiagram(related);
+
+  // Reset zoom and center
+  setTimeout(() => fitToScreen(), 100);
+}
+
+function findRelatedTables(tableName) {
+  const related = new Set([tableName]);
+  // Use parsed relationships for accurate connections
+  const info = relationshipMap[tableName];
+  if (info) {
+    for (const fk of info.fks) related.add(fk.target);
+    for (const ref of info.refs) related.add(ref.source);
+  }
+  // Also add tables from the same schema for context
+  const schema = tableName.split('_')[0];
+  for (const t of tableData) {
+    if (t.schema === schema) related.add(t.fullName);
+  }
+  return Array.from(related).slice(0, 15);
+}
+
+// ── Show FK section in relationships div ──
+function showModalRelationships(tableName) {
+  const container = document.getElementById('modalRelationships');
+  container.innerHTML = '';
+  const info = relationshipMap[tableName];
+  if (!info || (info.fks.length === 0 && info.refs.length === 0)) return;
+
+  let html = '<div class="fk-section">';
+
+  if (info.fks.length > 0) {
+    html += '<h3 class="fk-heading">\u2192 Chaves Estrangeiras (referencia)</h3><ul class="fk-list">';
+    // Deduplicate by target
+    const seen = new Set();
+    for (const fk of info.fks) {
+      const key = fk.target + '|' + (fk.column || '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const col = fk.column ? '<code>' + fk.column + '</code> \u2192 ' : '';
+      html += '<li>' + col + '<strong>' + fk.target + '</strong> <span class="domain-badge">' + fk.domain + '</span></li>';
+    }
+    html += '</ul>';
+  }
+
+  if (info.refs.length > 0) {
+    html += '<h3 class="fk-heading">\u2190 Referenciado por</h3><ul class="fk-list">';
+    const seen = new Set();
+    for (const ref of info.refs) {
+      const key = ref.source + '|' + (ref.column || '');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const col = ref.column ? ' (<code>' + ref.column + '</code>)' : '';
+      html += '<li><strong>' + ref.source + '</strong>' + col + ' <span class="domain-badge">' + ref.domain + '</span></li>';
+    }
+    html += '</ul>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ── Show table details modal ──
+function showTableDetails(tableName) {
+  const t = tableData.find(t => t.fullName === tableName);
+  if (!t) return;
+
+  document.getElementById('modalTitle').textContent = tableName;
+  const tbody = document.getElementById('modalBody');
+  tbody.innerHTML = '';
+
+  for (const col of t.columns) {
+    const tr = document.createElement('tr');
+    const attrs = col.attrs || '';
+    let attrsHtml = '';
+    if (attrs.includes('PK')) attrsHtml += '<span class="badge-pk">PK</span> ';
+    if (attrs.includes('FK')) attrsHtml += '<span class="badge-fk">FK</span> ';
+    if (attrs.includes('not null')) attrsHtml += '<span class="badge-nn">NN</span> ';
+
+    tr.innerHTML = `<td>${col.name}</td><td>${col.type}</td><td>${attrsHtml}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  document.getElementById('modalComment').textContent = '';
+  showModalRelationships(tableName);
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+// ── Zoom / Pan ──
+function applyTransform() {
+  const container = document.getElementById('mermaid-container');
+  container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+  document.getElementById('zoomLevel').textContent = `${Math.round(scale * 100)}%`;
+}
+
+function zoomIn() { scale = Math.min(3, scale * 1.2); applyTransform(); }
+function zoomOut() { scale = Math.max(0.1, scale / 1.2); applyTransform(); }
+function resetZoom() { scale = 1; offsetX = 40; offsetY = 40; applyTransform(); }
+
+function fitToScreen() {
+  const svg = document.querySelector('#mermaid-container svg');
+  const wrapper = document.getElementById('canvasWrapper');
+  if (!svg || !wrapper) return;
+  const svgRect = svg.getBoundingClientRect();
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const scaleX = (wrapperRect.width - 80) / svgRect.width;
+  const scaleY = (wrapperRect.height - 80) / svgRect.height;
+  scale = Math.min(scaleX, scaleY, 1.5);
+  offsetX = 40;
+  offsetY = 40;
+  applyTransform();
+}
+
+// ── Pan handler ──
+document.getElementById('mermaid-container').addEventListener('mousedown', (e) => {
+  if (e.target.closest('.er.entityBox')) return;
+  isDragging = true;
+  dragStartX = e.clientX - offsetX;
+  dragStartY = e.clientY - offsetY;
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  offsetX = e.clientX - dragStartX;
+  offsetY = e.clientY - dragStartY;
+  applyTransform();
+});
+
+document.addEventListener('mouseup', () => { isDragging = false; });
+
+// Wheel zoom
+document.getElementById('canvasWrapper').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  scale = Math.max(0.1, Math.min(3, scale * delta));
+  applyTransform();
+}, { passive: false });
+
+// ── Search ──
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  let visible = 0;
+
+  document.querySelectorAll('.table-item').forEach(el => {
+    const name = el.textContent.toLowerCase();
+    const show = !q || name.includes(q);
+    el.style.display = show ? 'block' : 'none';
+    if (show) visible++;
+  });
+
+  document.querySelectorAll('.schema-group').forEach(group => {
+    const hasVisible = Array.from(group.querySelectorAll('.table-item')).some(el => el.style.display !== 'none');
+    group.style.display = hasVisible ? 'block' : 'none';
+  });
+
+  updateCount(visible);
+  document.getElementById('emptyState').style.display = visible === 0 ? 'block' : 'none';
+});
+
+function updateCount(visible) {
+  document.getElementById('visibleCount').textContent = visible;
+}
+
+// ── Theme ──
+function toggleTheme() {
+  const html = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  if (html.getAttribute('data-theme') === 'dark') {
+    html.removeAttribute('data-theme');
+    btn.textContent = '🌙';
+    localStorage.setItem(THEME_KEY, 'light');
+    updateMermaidTheme('light');
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    btn.textContent = '☀️';
+    localStorage.setItem(THEME_KEY, 'dark');
+    updateMermaidTheme('dark');
+  }
+}
+
+function updateMermaidTheme(theme) {
+  if (theme === 'dark') {
+    mermaid.initialize({
+      theme: 'dark',
+      themeVariables: {
+        background: '#1a1d2e',
+        primaryColor: '#6c8cff',
+        primaryBorderColor: '#6c8cff',
+        primaryTextColor: '#e4e6f0',
+        lineColor: '#4a4d6e',
+        secondaryColor: '#252840',
+        tertiaryColor: '#1a1d2e',
+      },
+      er: { diagramPadding: 20, layoutDirection: 'TB', minEntityWidth: 160, minEntityHeight: 60, stroke: '#2d3154', fill: '#1a1d2e', fontSize: 12, useMaxWidth: false, },
+    });
+  } else {
+    mermaid.initialize({
+      theme: 'base',
+      themeVariables: {
+        background: '#ffffff',
+        primaryColor: '#4361ee',
+        primaryBorderColor: '#4361ee',
+        primaryTextColor: '#212529',
+        lineColor: '#adb5bd',
+        secondaryColor: '#f8f9fa',
+        tertiaryColor: '#ffffff',
+      },
+      er: { diagramPadding: 20, layoutDirection: 'TB', minEntityWidth: 160, minEntityHeight: 60, stroke: '#dee2e6', fill: '#ffffff', fontSize: 12, },
+    });
+  }
+  renderDiagram();
+}
+
+// ── Init ──
+const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+if (savedTheme === 'dark') {
+  document.documentElement.setAttribute('data-theme', 'dark');
+  document.getElementById('themeToggle').textContent = '☀️';
+  updateMermaidTheme('dark');
+}
+
+buildSidebar();
+// Build relationship map from parsed data
+const relationships = parseRelationships(ER_DIAGRAM);
+relationshipMap = buildFKMap(tableData, relationships);
+renderDiagram();
+
+// Fit to screen after render
+setTimeout(fitToScreen, 500);
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 05: Busca e Filtros
+// Arquivo: 05-busca-filtros.dbml
+// Schema(s): search
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table search_restaurant_search_fallback {
+    restaurant_id uuid  [pk]
+    name varchar(255)  [not null]
+    description text 
+    cuisine_type varchar(64) 
+    avg_rating decimal(3,2) 
+    review_count integer  [not null, default: `0`]
+    delivery_fee_cents integer  [not null, default: `0`]
+    is_open boolean  [not null, default: `false`]
+    last_menu_version integer  [not null, default: `0`]
+    location geography 
+    full_text tsvector 
+}
+
+// ── References to Other Domains ──
+
+// → [02] onboarding-admin: Onboarding Admin
+// Ref: search_restaurant_search_fallback.restaurant_id > onboarding_restaurant_profiles.id

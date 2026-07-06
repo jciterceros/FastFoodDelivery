@@ -1,0 +1,127 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 02: Onboarding Admin
+// Arquivo: 02-onboarding-admin.dbml
+// Schema(s): onboarding
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table onboarding_onboarding_applications {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    user_id uuid  [not null]
+    type varchar(32)  [not null]
+    status varchar(32)  [not null, default: `'PENDING'`]
+    submitted_at timestamp 
+    reviewed_at timestamp 
+    reviewer_id uuid 
+    rejection_reason varchar(64) 
+    rejection_note text 
+    resubmitted_from uuid 
+    metadata jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table onboarding_application_documents {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    doc_type varchar(64)  [not null]
+    storage_key varchar(512)  [not null]
+    original_filename varchar(255) 
+    mime_type varchar(64) 
+    file_size_bytes integer 
+    checksum varchar(64) 
+    uploaded_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id, doc_type)'
+}
+
+Table onboarding_restaurant_profiles {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    owner_user_id uuid  [not null]
+    legal_name varchar(255)  [not null]
+    trading_name varchar(255) 
+    cnpj varchar(18)  [not null]
+    cpf_responsavel varchar(14) 
+    address_id uuid 
+    phone varchar(32) 
+    operating_hours_json jsonb 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id)'
+    note: 'unique(cnpj)'
+}
+
+Table onboarding_courier_profiles {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    user_id uuid  [not null]
+    vehicle_type varchar(32) 
+    license_number varchar(32)  [not null]
+    license_expiry date 
+    license_category varchar(8) 
+    vehicle_plate varchar(16) 
+    vehicle_year integer 
+    vehicle_color varchar(32) 
+    status varchar(32)  [not null, default: `'PENDING'`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(application_id)'
+    note: 'unique(license_number)'
+}
+
+Table onboarding_moderation_audit_log {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    application_id uuid  [not null]
+    action varchar(64)  [not null]
+    from_status varchar(32) 
+    to_status varchar(32) 
+    reviewer_id uuid 
+    comment text 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: onboarding_application_documents.application_id > onboarding_onboarding_applications.id
+Ref: onboarding_courier_profiles.application_id > onboarding_onboarding_applications.id
+Ref: onboarding_moderation_audit_log.application_id > onboarding_onboarding_applications.id
+Ref: onboarding_onboarding_applications.resubmitted_from > onboarding_onboarding_applications.id
+Ref: onboarding_restaurant_profiles.application_id > onboarding_onboarding_applications.id
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: onboarding_courier_profiles.user_id > auth_users.id
+// Ref: onboarding_moderation_audit_log.reviewer_id > auth_users.id
+// Ref: onboarding_onboarding_applications.reviewer_id > auth_users.id
+// Ref: onboarding_onboarding_applications.user_id > auth_users.id
+// Ref: onboarding_restaurant_profiles.address_id > user_user_addresses.id
+// Ref: onboarding_restaurant_profiles.owner_user_id > auth_users.id
+
+// ── Referenced by Other Domains ──
+
+// ← [03] gestao-cardapio: Gestao de Cardapio
+// Ref: menu_menu_categories.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: menu_menu_snapshots.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: menu_restaurant_schedules.restaurant_id > onboarding_restaurant_profiles.id
+
+// ← [04] geolocalizacao-cobertura: Geolocalizacao e Cobertura
+// Ref: coverage_delivery_fee_tiers.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: coverage_delivery_zones.restaurant_id > onboarding_restaurant_profiles.id
+
+// ← [05] busca-filtros: Busca e Filtros
+// Ref: search_restaurant_search_fallback.restaurant_id > onboarding_restaurant_profiles.id
+
+// ← [06] carrinho-pedido: Carrinho e Pedido
+// Ref: order_orders.restaurant_id > onboarding_restaurant_profiles.id
+
+// ← [08] estados-pedido-restaurante: Estados do Pedido
+// Ref: order_order_sla_config.restaurant_id > onboarding_restaurant_profiles.id
+
+// ← [14] painel-financeiro-restaurante: Painel Financeiro
+// Ref: finance_bank_accounts.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_daily_restaurant_rollups.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_ledger_entries.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_payout_config.restaurant_id > onboarding_restaurant_profiles.id
+// Ref: finance_payouts.restaurant_id > onboarding_restaurant_profiles.id

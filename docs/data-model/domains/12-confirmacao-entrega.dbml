@@ -1,0 +1,69 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 12: Confirmacao de Entrega
+// Arquivo: 12-confirmacao-entrega.dbml
+// Schema(s): verification
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table verification_delivery_verification_codes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    order_id uuid  [not null]
+    code_hash varchar(255)  [not null]
+    code_prefix varchar(8) 
+    status varchar(32)  [not null, default: `'ACTIVE'`]
+    generated_at timestamp  [not null, default: `NOW()`]
+    expires_at timestamp  [not null]
+    confirmed_at timestamp 
+    confirmed_by_courier_id uuid 
+    confirmed_by_admin_id uuid 
+    revoked_at timestamp 
+    revocation_reason varchar(255) 
+    note: 'unique(delivery_id)'
+}
+
+Table verification_delivery_verification_attempts {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    courier_id uuid  [not null]
+    code_submitted varchar(255)  [not null]
+    code_submitted_prefix varchar(8) 
+    result varchar(32)  [not null]
+    courier_lat decimal(10,7) 
+    courier_lon decimal(10,7) 
+    geohash varchar(12) 
+    ip_address varchar(45) 
+    created_at timestamp  [not null, default: `NOW()`]
+}
+
+Table verification_delivery_disputes {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    delivery_id uuid  [not null]
+    order_id uuid  [not null]
+    opened_by varchar(32)  [not null]
+    reason varchar(255)  [not null]
+    status varchar(32)  [not null, default: `'OPEN'`]
+    resolution varchar(255) 
+    resolved_by uuid 
+    resolved_at timestamp 
+    evidence jsonb 
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(delivery_id)'
+}
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: verification_delivery_disputes.resolved_by > auth_users.id
+// Ref: verification_delivery_verification_attempts.courier_id > auth_users.id
+// Ref: verification_delivery_verification_codes.confirmed_by_admin_id > auth_users.id
+// Ref: verification_delivery_verification_codes.confirmed_by_courier_id > auth_users.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: verification_delivery_disputes.order_id > order_orders.id
+// Ref: verification_delivery_verification_codes.order_id > order_orders.id
+
+// → [09] matching-entregador: Matching Entregador
+// Ref: verification_delivery_disputes.delivery_id > dispatch_delivery_assignments.id
+// Ref: verification_delivery_verification_attempts.delivery_id > dispatch_delivery_assignments.id
+// Ref: verification_delivery_verification_codes.delivery_id > dispatch_delivery_assignments.id

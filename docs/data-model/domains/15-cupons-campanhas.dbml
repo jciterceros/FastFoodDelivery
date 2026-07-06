@@ -1,0 +1,111 @@
+// ====================================================================
+// FastFoodDelivery — Dominio 15: Cupons e Campanhas
+// Arquivo: 15-cupons-campanhas.dbml
+// Schema(s): promotion
+// Gerado automaticamente de V1__Initial_Schema.sql
+// ====================================================================
+
+Table promotion_campaigns {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    name varchar(255)  [not null]
+    description text 
+    type varchar(32)  [not null]
+    budget_cents integer  [not null, default: `0`]
+    budget_spent_cents integer  [not null, default: `0`]
+    starts_at timestamp  [not null]
+    ends_at timestamp  [not null]
+    status varchar(32)  [not null, default: `'DRAFT'`]
+    target_metric varchar(64) 
+    roi_goal_percent decimal(5,2) 
+    created_by uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table promotion_coupons {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    code varchar(64)  [not null]
+    campaign_id uuid  [not null]
+    type varchar(32)  [not null]
+    value_cents integer 
+    value_percent decimal(5,2) 
+    max_discount_cents integer 
+    min_order_cents integer  [not null, default: `0`]
+    max_redemptions integer 
+    max_per_user integer  [not null, default: `1`]
+    starts_at timestamp  [not null]
+    ends_at timestamp  [not null]
+    restaurant_scope varchar(32) 
+    restaurant_ids uuid[] 
+    region_scope varchar(32) 
+    region_geohashes varchar[] 
+    first_purchase_only boolean  [not null, default: `false`]
+    subsidy_type varchar(32) 
+    subsidy_platform_percent decimal(5,2) 
+    is_active boolean  [not null, default: `true`]
+    created_by uuid 
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(code)'
+}
+
+Table promotion_coupon_redemptions {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    coupon_id uuid  [not null]
+    user_id uuid  [not null]
+    order_id uuid  [not null]
+    discount_cents integer  [not null]
+    original_total_cents integer  [not null]
+    final_total_cents integer  [not null]
+    rules_snapshot jsonb 
+    subsidy_platform_cents integer  [not null, default: `0`]
+    subsidy_restaurant_cents integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(order_id)'
+}
+
+Table promotion_delivery_fee_rules {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    zone_id uuid  [not null]
+    region_geometry jsonb 
+    fee_cents integer  [not null, default: `0`]
+    min_order_cents integer  [not null, default: `0`]
+    free_delivery_above_cents integer 
+    valid_from timestamp  [not null]
+    valid_to timestamp 
+    priority integer  [not null, default: `0`]
+    is_active boolean  [not null, default: `true`]
+    created_at timestamp  [not null, default: `NOW()`]
+    updated_at timestamp  [not null, default: `NOW()`]
+}
+
+Table promotion_campaign_daily_stats {
+    id uuid  [pk, default: `uuid_generate_v4()`]
+    campaign_id uuid  [not null]
+    date date  [not null]
+    redemptions integer  [not null, default: `0`]
+    discount_cents integer  [not null, default: `0`]
+    gross_order_cents integer  [not null, default: `0`]
+    new_users integer  [not null, default: `0`]
+    created_at timestamp  [not null, default: `NOW()`]
+    note: 'unique(campaign_id, date)'
+}
+
+// ── Intra-domain Relationships ──
+
+Ref: promotion_campaign_daily_stats.campaign_id > promotion_campaigns.id
+Ref: promotion_coupon_redemptions.coupon_id > promotion_coupons.id
+Ref: promotion_coupons.campaign_id > promotion_campaigns.id
+
+// ── References to Other Domains ──
+
+// → [01] identidade-usuarios: Identidade e Usuarios
+// Ref: promotion_campaigns.created_by > auth_users.id
+// Ref: promotion_coupon_redemptions.user_id > auth_users.id
+// Ref: promotion_coupons.created_by > auth_users.id
+
+// → [04] geolocalizacao-cobertura: Geolocalizacao e Cobertura
+// Ref: promotion_delivery_fee_rules.zone_id > coverage_delivery_zones.id
+
+// → [06] carrinho-pedido: Carrinho e Pedido
+// Ref: promotion_coupon_redemptions.order_id > order_orders.id
